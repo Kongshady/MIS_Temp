@@ -453,6 +453,30 @@ function get_accessible_menu() {
             'permission' => 'physicians.view'
         ],
         [
+            'label' => 'Lab Results',
+            'url' => '/mis_project/modules/lab_results.php',
+            'icon' => '🔬',
+            'permission' => 'lab_results.view'
+        ],
+        [
+            'label' => 'Tests',
+            'url' => '/mis_project/modules/tests.php',
+            'icon' => '🧪',
+            'permission' => 'tests.manage'
+        ],
+        [
+            'label' => 'Sections',
+            'url' => '/mis_project/modules/sections.php',
+            'icon' => '🏢',
+            'permission' => 'sections.manage'
+        ],
+        [
+            'label' => 'Employees',
+            'url' => '/mis_project/modules/employees.php',
+            'icon' => '👨‍💼',
+            'permission' => 'employees.view'
+        ],
+        [
             'label' => 'Transactions',
             'url' => '/mis_project/modules/transactions.php',
             'icon' => '📝',
@@ -479,7 +503,7 @@ function get_accessible_menu() {
         [
             'label' => 'Calibration',
             'url' => '/mis_project/modules/calibration.php',
-            'icon' => '🔬',
+            'icon' => '⚖️',
             'permission' => 'calibration.view'
         ],
         [
@@ -490,27 +514,9 @@ function get_accessible_menu() {
         ],
         [
             'label' => 'Reports',
-            'url' => '/mis_project/modules/reports.php',
+            'url' => '/mis_project/reports/compliance_reports.php',
             'icon' => '📈',
             'permission' => 'reports.view'
-        ],
-        [
-            'label' => 'Tests',
-            'url' => '/mis_project/modules/tests.php',
-            'icon' => '🧪',
-            'permission' => 'tests.manage'
-        ],
-        [
-            'label' => 'Sections',
-            'url' => '/mis_project/modules/sections.php',
-            'icon' => '🏢',
-            'permission' => 'sections.manage'
-        ],
-        [
-            'label' => 'Users',
-            'url' => '/mis_project/modules/users.php',
-            'icon' => '👤',
-            'permission' => 'users.manage'
         ],
         [
             'label' => 'Activity Logs',

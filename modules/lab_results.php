@@ -237,7 +237,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                                     </a>
                                 </td>
                                 <td>
-                                    <span class="badge <?php echo $order['patient_type'] == 'Student/Faculty' ? 'badge-info' : 'badge-secondary'; ?>">
+                                    <span class="badge <?php echo $order['patient_type'] == 'Internal' ? 'badge-info' : 'badge-secondary'; ?>">
                                         <?php echo htmlspecialchars($order['patient_type']); ?>
                                     </span>
                                 </td>

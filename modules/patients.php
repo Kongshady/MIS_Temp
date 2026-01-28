@@ -16,11 +16,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $gender = $_POST['gender'];
             $contact_number = $_POST['contact_number'];
             $address = $_POST['address'];
-            $physician_id = !empty($_POST['physician_id']) ? $_POST['physician_id'] : NULL;
             $status_code = 1; // Default to Active
             
-            $stmt = $conn->prepare("INSERT INTO patient (patient_type, firstname, middlename, lastname, birthdate, gender, contact_number, address, physician_id, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssssssii", $patient_type, $firstname, $middlename, $lastname, $birthdate, $gender, $contact_number, $address, $physician_id, $status_code);
+            $stmt = $conn->prepare("INSERT INTO patient (patient_type, firstname, middlename, lastname, birthdate, gender, contact_number, address, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssssssi", $patient_type, $firstname, $middlename, $lastname, $birthdate, $gender, $contact_number, $address, $status_code);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Patient added successfully!</div>';
@@ -37,10 +36,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $gender = $_POST['gender'];
             $contact_number = $_POST['contact_number'];
             $address = $_POST['address'];
-            $physician_id = !empty($_POST['physician_id']) ? $_POST['physician_id'] : NULL;
             
-            $stmt = $conn->prepare("UPDATE patient SET patient_type=?, firstname=?, middlename=?, lastname=?, birthdate=?, gender=?, contact_number=?, address=?, physician_id=? WHERE patient_id=?");
-            $stmt->bind_param("ssssssssii", $patient_type, $firstname, $middlename, $lastname, $birthdate, $gender, $contact_number, $address, $physician_id, $patient_id);
+            $stmt = $conn->prepare("UPDATE patient SET patient_type=?, firstname=?, middlename=?, lastname=?, birthdate=?, gender=?, contact_number=?, address=? WHERE patient_id=?");
+            $stmt->bind_param("ssssssssi", $patient_type, $firstname, $middlename, $lastname, $birthdate, $gender, $contact_number, $address, $patient_id);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Patient updated successfully!</div>';
@@ -72,9 +70,8 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 }
 
 // Get all active patients
-$patients = $conn->query("SELECT p.*, ph.physician_name 
+$patients = $conn->query("SELECT p.*
                          FROM patient p 
-                         LEFT JOIN physician ph ON p.physician_id = ph.physician_id
                          WHERE p.status_code = 1 $search_query
                          ORDER BY p.datetime_added DESC");
 ?>
@@ -97,8 +94,8 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                     <label>Patient Type *</label>
                     <select name="patient_type" class="form-control" required>
                         <option value="">Select Type</option>
-                        <option value="Walk-in">Walk-in</option>
-                        <option value="Student/Faculty">Student/Faculty</option>
+                        <option value="Internal">Internal</option>
+                        <option value="External">External</option>
                     </select>
                 </div>
                 
@@ -141,19 +138,6 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                     <label>Address</label>
                     <input type="text" name="address" class="form-control" placeholder="123 Street, City">
                 </div>
-                
-                <div class="form-group">
-                    <label>Physician</label>
-                    <select name="physician_id" class="form-control">
-                        <option value="">Select Physician</option>
-                        <?php 
-                        $physicians = $conn->query("SELECT * FROM physician ORDER BY physician_name");
-                        while($physician = $physicians->fetch_assoc()): 
-                        ?>
-                            <option value="<?php echo $physician['physician_id']; ?>"><?php echo htmlspecialchars($physician['physician_name']); ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
             </div>
             
             <button type="submit" class="btn btn-primary">Add Patient</button>
@@ -180,7 +164,6 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                         <th>Birthdate</th>
                         <th>Gender</th>
                         <th>Contact</th>
-                        <th>Physician</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -189,7 +172,7 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                         <tr>
                             <td><?php echo $patient['patient_id']; ?></td>
                             <td>
-                                <span class="badge <?php echo $patient['patient_type'] == 'Walk-in' ? 'badge-info' : 'badge-success'; ?>">
+                                <span class="badge <?php echo $patient['patient_type'] == 'Internal' ? 'badge-info' : 'badge-success'; ?>">
                                     <?php echo htmlspecialchars($patient['patient_type']); ?>
                                 </span>
                             </td>
@@ -197,7 +180,6 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                             <td><?php echo $patient['birthdate'] ? date('M d, Y', strtotime($patient['birthdate'])) : 'N/A'; ?></td>
                             <td><?php echo htmlspecialchars($patient['gender'] ?? 'N/A'); ?></td>
                             <td><?php echo htmlspecialchars($patient['contact_number'] ?? 'N/A'); ?></td>
-                            <td><?php echo htmlspecialchars($patient['physician_name'] ?? 'N/A'); ?></td>
                             <td class="table-actions">
                                 <a href="patient_details.php?id=<?php echo $patient['patient_id']; ?>" class="btn btn-info btn-sm">Details</a>
                                 <button class="btn btn-warning btn-sm" onclick="editPatient(<?php echo htmlspecialchars(json_encode($patient)); ?>)">Edit</button>
@@ -224,8 +206,8 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                 <div class="form-group">
                     <label>Patient Type *</label>
                     <select name="patient_type" id="edit_patient_type" class="form-control" required>
-                        <option value="Walk-in">Walk-in</option>
-                        <option value="Student/Faculty">Student/Faculty</option>
+                        <option value="Internal">Internal</option>
+                        <option value="External">External</option>
                     </select>
                 </div>
                 
@@ -267,19 +249,6 @@ $patients = $conn->query("SELECT p.*, ph.physician_name
                     <label>Address</label>
                     <input type="text" name="address" id="edit_address" class="form-control">
                 </div>
-                
-                <div class="form-group">
-                    <label>Physician</label>
-                    <select name="physician_id" id="edit_physician_id" class="form-control">
-                        <option value="">Select Physician</option>
-                        <?php 
-                        $physicians = $conn->query("SELECT * FROM physician ORDER BY physician_name");
-                        while($physician = $physicians->fetch_assoc()): 
-                        ?>
-                            <option value="<?php echo $physician['physician_id']; ?>"><?php echo htmlspecialchars($physician['physician_name']); ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
             </div>
             
             <div style="display: flex; gap: 1rem; margin-top: 1.5rem;">
@@ -301,7 +270,6 @@ function editPatient(patient) {
     document.getElementById('edit_gender').value = patient.gender;
     document.getElementById('edit_contact_number').value = patient.contact_number || '';
     document.getElementById('edit_address').value = patient.address || '';
-    document.getElementById('edit_physician_id').value = patient.physician_id || '';
     
     document.getElementById('editModal').style.display = 'block';
 }

@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $username = $_POST['username'];
             $password_hash = password_hash($_POST['password'], PASSWORD_BCRYPT);
             $position = $_POST['position'];
-            $status_code = $_POST['status_code'];
+            $status_code = 1; // Always set to Active when adding new employee
             $role_id = isset($_POST['role_id']) ? $_POST['role_id'] : null;
             
             $stmt = $conn->prepare("INSERT INTO employee (section_id, firstname, middlename, lastname, username, password_hash, position, role_id, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -153,19 +153,6 @@ $employees = $conn->query("SELECT e.employee_id, e.section_id, e.firstname, e.mi
                         ?>
                     </select>
                 </div>
-                
-                <div class="form-group">
-                    <label>Status *</label>
-                    <select name="status_code" class="form-control" required>
-                        <option value="">Select Status</option>
-                        <?php 
-                        $status_codes = $conn->query("SELECT * FROM status_code");
-                        while($status = $status_codes->fetch_assoc()): 
-                        ?>
-                            <option value="<?php echo $status['status_code']; ?>"><?php echo htmlspecialchars($status['label']); ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
             </div>
             
             <button type="submit" class="btn btn-primary">Add Employee</button>
@@ -233,7 +220,7 @@ $employees = $conn->query("SELECT e.employee_id, e.section_id, e.firstname, e.mi
                 <label>Section *</label>
                 <select name="section_id" id="edit_section_id" class="form-control" required>
                     <?php 
-                    $sections = $conn->query("SELECT * FROM clinlab_section");
+                    $sections = $conn->query("SELECT * FROM section");
                     while($section = $sections->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>
@@ -288,7 +275,7 @@ $employees = $conn->query("SELECT e.employee_id, e.section_id, e.firstname, e.mi
                 <label>Status *</label>
                 <select name="status_code" id="edit_status_code" class="form-control" required>
                     <?php 
-                    $status_codes = $conn->query("SELECT * FROM clinlab_status_code");
+                    $status_codes = $conn->query("SELECT * FROM status_code");
                     while($status = $status_codes->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $status['status_code']; ?>"><?php echo htmlspecialchars($status['label']); ?></option>

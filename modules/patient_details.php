@@ -66,9 +66,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Get patient details
-$patient_query = $conn->prepare("SELECT p.*, ph.physician_name 
+$patient_query = $conn->prepare("SELECT p.* 
                                  FROM patient p 
-                                 LEFT JOIN physician ph ON p.physician_id = ph.physician_id
                                  WHERE p.patient_id = ?");
 $patient_query->bind_param("i", $patient_id);
 $patient_query->execute();
@@ -106,7 +105,7 @@ $lab_results = $conn->query("SELECT lr.*, t.label as test_name, e.firstname, e.l
             <div>
                 <strong>Patient Type:</strong>
                 <p>
-                    <span class="badge <?php echo $patient['patient_type'] == 'Walk-in' ? 'badge-info' : 'badge-success'; ?>">
+                    <span class="badge <?php echo $patient['patient_type'] == 'Internal' ? 'badge-info' : 'badge-success'; ?>">
                         <?php echo htmlspecialchars($patient['patient_type']); ?>
                     </span>
                 </p>
@@ -142,10 +141,6 @@ $lab_results = $conn->query("SELECT lr.*, t.label as test_name, e.firstname, e.l
             <div>
                 <strong>Address:</strong>
                 <p><?php echo htmlspecialchars($patient['address'] ?? 'N/A'); ?></p>
-            </div>
-            <div>
-                <strong>Physician:</strong>
-                <p><?php echo htmlspecialchars($patient['physician_name'] ?? 'N/A'); ?></p>
             </div>
         </div>
         

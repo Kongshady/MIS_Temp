@@ -11,10 +11,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $section_id = $_POST['section_id'];
             $item_type_id = $_POST['item_type_id'];
             $label = $_POST['label'];
-            $status_code = intval($_POST['status_code']); // Ensure it's an integer
             
-            $stmt = $conn->prepare("INSERT INTO item (section_id, item_type_id, label, status_code) VALUES (?, ?, ?, ?)");
-            $stmt->bind_param("iisi", $section_id, $item_type_id, $label, $status_code);
+            $stmt = $conn->prepare("INSERT INTO item (section_id, item_type_id, label) VALUES (?, ?, ?)");
+            $stmt->bind_param("iis", $section_id, $item_type_id, $label);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success">Item added successfully!</div>';
@@ -31,10 +30,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $section_id = $_POST['section_id'];
             $item_type_id = $_POST['item_type_id'];
             $label = $_POST['label'];
-            $status_code = intval($_POST['status_code']); // Ensure it's an integer
             
-            $stmt = $conn->prepare("UPDATE item SET section_id=?, item_type_id=?, label=?, status_code=? WHERE item_id=?");
-            $stmt->bind_param("iisii", $section_id, $item_type_id, $label, $status_code, $item_id);
+            $stmt = $conn->prepare("UPDATE item SET section_id=?, item_type_id=?, label=? WHERE item_id=?");
+            $stmt->bind_param("iisi", $section_id, $item_type_id, $label, $item_id);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success">Item updated successfully!</div>';
@@ -57,13 +55,6 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 
 // Get search parameter
 $search = isset($_GET['search']) ? $_GET['search'] : '';
-
-// Get status codes from database
-$status_codes_result = $conn->query("SELECT status_code, label FROM status_code ORDER BY status_code");
-$status_codes = [];
-while ($sc = $status_codes_result->fetch_assoc()) {
-    $status_codes[$sc['status_code']] = $sc['label'];
-}
 
 // Get all items with search
 $query = "SELECT i.*, s.label as section_name, it.label as item_type_name 
@@ -126,16 +117,6 @@ if ($search) {
                     <label>Item Name *</label>
                     <input type="text" name="label" class="form-control" required>
                 </div>
-                
-                <div class="form-group">
-                    <label>Status *</label>
-                    <select name="status_code" class="form-control" required>
-                        <option value="">Select Status</option>
-                        <?php foreach($status_codes as $code => $label): ?>
-                            <option value="<?php echo $code; ?>"><?php echo htmlspecialchars($label); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </div>
             </div>
             
             <button type="submit" class="btn btn-primary">Add Item</button>
@@ -165,28 +146,16 @@ if ($search) {
                         <th>Item Name</th>
                         <th>Section</th>
                         <th>Item Type</th>
-                        <th>Status</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($item = $items->fetch_assoc()): 
-                        // Map status codes to labels
-                        $status_code = intval($item['status_code']);
-                        $status_label = isset($status_codes[$status_code]) ? $status_codes[$status_code] : 'Unknown';
-                        
-                        // Badge colors based on status
-                        $badge_class = 'badge-info';
-                        if ($status_label == 'Active') $badge_class = 'badge-success';
-                        elseif ($status_label == 'Inactive') $badge_class = 'badge-danger';
-                        elseif ($status_label == 'Cancelled') $badge_class = 'badge-warning';
-                    ?>
+                    <?php while($item = $items->fetch_assoc()): ?>
                         <tr>
                             <td><?php echo $item['item_id']; ?></td>
                             <td><?php echo htmlspecialchars($item['label']); ?></td>
                             <td><?php echo htmlspecialchars($item['section_name']); ?></td>
                             <td><?php echo htmlspecialchars($item['item_type_name']); ?></td>
-                            <td><span class="badge <?php echo $badge_class; ?>"><?php echo $status_label; ?></span></td>
                             <td class="table-actions">
                                 <button class="btn btn-warning btn-sm" onclick="editItem(<?php echo htmlspecialchars(json_encode($item)); ?>)">Edit</button>
                                 <button class="btn btn-danger btn-sm" onclick="confirmDelete(<?php echo $item['item_id']; ?>, '<?php echo htmlspecialchars($item['label']); ?>')">Delete</button>
@@ -238,15 +207,6 @@ if ($search) {
                 <input type="text" name="label" id="edit_label" class="form-control" required>
             </div>
             
-            <div class="form-group">
-                <label>Status *</label>
-                <select name="status_code" id="edit_status_code" class="form-control" required>
-                    <?php foreach($status_codes as $code => $label): ?>
-                        <option value="<?php echo $code; ?>"><?php echo htmlspecialchars($label); ?></option>
-                    <?php endforeach; ?>
-                </select>
-            </div>
-            
             <div style="display: flex; gap: 1rem;">
                 <button type="submit" class="btn btn-primary">Update</button>
                 <button type="button" class="btn btn-danger" onclick="closeEditModal()">Cancel</button>
@@ -280,7 +240,6 @@ function editItem(item) {
     document.getElementById('edit_section_id').value = item.section_id;
     document.getElementById('edit_item_type_id').value = item.item_type_id;
     document.getElementById('edit_label').value = item.label;
-    document.getElementById('edit_status_code').value = item.status_code;
     document.getElementById('editModal').style.display = 'block';
 }
 
