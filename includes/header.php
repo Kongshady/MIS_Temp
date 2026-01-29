@@ -6,23 +6,26 @@ require_once __DIR__ . '/auth.php';
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><?php echo isset($page_title) ? $page_title : 'Clinical Laboratory Management System'; ?></title>
+    
+    <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Kit -->
+    <script src="https://kit.fontawesome.com/e4a261e8da.js" crossorigin="anonymous"></script>
+    
+    <!-- Custom Styles -->
     <link rel="stylesheet" href="../assets/css/style.css">
-    <style>
-        * {
-            font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
-        }
-    </style>
 </head>
 <body>
     <!-- Sidebar Navigation -->
     <aside class="sidebar">
         <div class="sidebar-header">
-            <h2>🏥 Clinical Lab</h2>
+            <h2><i class="fa-solid fa-hospital"></i> Clinical Lab</h2>
         </div>
         <nav class="sidebar-nav">
             <?php
@@ -37,8 +40,8 @@ require_once __DIR__ . '/auth.php';
             <?php endforeach; ?>
         </nav>
         <div class="sidebar-footer">
-            <a href="/mis_project/logout.php" class="nav-item logout-link">
-                <span class="nav-icon">🚪</span>
+            <a href="/Proto/MIS_Temp/logout.php" class="nav-item logout-link">
+                <span class="nav-icon"><i class="fa-solid fa-right-from-bracket"></i></span>
                 <span class="nav-text">Logout</span>
             </a>
         </div>

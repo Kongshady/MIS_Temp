@@ -18,6 +18,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("issss", $equipment_id, $procedure_name, $standard_reference, $frequency, $next_due_date);
             
             if ($stmt->execute()) {
+                $equipment_name = $conn->query("SELECT name FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc()['name'];
+                log_activity($conn, get_user_id(), "Added calibration procedure: $procedure_name for $equipment_name ($frequency)", 1);
                 $message = '<div class="alert alert-success">Calibration procedure added!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -38,6 +40,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($next_calibration_date) {
                     $conn->query("UPDATE calibration_procedure SET next_due_date='$next_calibration_date' WHERE procedure_id=$procedure_id");
                 }
+                $equipment_name = $conn->query("SELECT name FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc()['name'];
+                log_activity($conn, get_user_id(), "Recorded calibration for $equipment_name - Result: $result_status", 1);
                 $message = '<div class="alert alert-success">Calibration record added!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -53,12 +57,12 @@ $upcoming_calibrations = $conn->query("SELECT * FROM v_upcoming_calibration");
 <div class="container">
     <?php echo $message; ?>
     
-    <h1>🔬 Calibration & Testing Monitoring</h1>
+    <h1><i class="fas fa-balance-scale"></i> Calibration & Testing Monitoring</h1>
     
     <!-- Calibration Alerts -->
     <div class="card">
         <div class="card-header">
-            <h2>⚠️ Calibration Alerts</h2>
+            <h2><i class="fas fa-exclamation-triangle"></i> Calibration Alerts</h2>
         </div>
         
         <?php if ($upcoming_calibrations->num_rows > 0): ?>
@@ -104,7 +108,7 @@ $upcoming_calibrations = $conn->query("SELECT * FROM v_upcoming_calibration");
     <!-- Calibration Procedures -->
     <div class="card">
         <div class="card-header">
-            <h2>📋 Calibration Procedures</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Calibration Procedures</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddProcedureModal()" style="margin-bottom: 1rem;">Add New Procedure</button>
@@ -148,7 +152,7 @@ $upcoming_calibrations = $conn->query("SELECT * FROM v_upcoming_calibration");
     <!-- Recent Calibration Records -->
     <div class="card">
         <div class="card-header">
-            <h2>📊 Recent Calibration Records</h2>
+            <h2><i class="fas fa-chart-bar"></i> Recent Calibration Records</h2>
         </div>
         
         <?php

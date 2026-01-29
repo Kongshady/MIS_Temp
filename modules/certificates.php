@@ -16,6 +16,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("sss", $template_name, $template_type, $html_layout);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Created certificate template: $template_name (Type: $template_type)", 1);
                 $message = '<div class="alert alert-success">Certificate template added!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -49,6 +50,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("sissiiiiis", $certificate_number, $template_id, $certificate_type, $linked_record_id, $linked_table, $patient_id, $equipment_id, $issued_by, $verified_by, $certificate_data);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Generated certificate: $certificate_number (Type: $certificate_type)", 1);
                 $message = '<div class="alert alert-success">Certificate generated! Certificate Number: ' . $certificate_number . '</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -56,8 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } elseif ($_POST['action'] == 'update_status') {
             $certificate_id = $_POST['certificate_id'];
             $new_status = $_POST['new_status'];
+            $cert_info = $conn->query("SELECT certificate_number FROM certificate WHERE certificate_id = $certificate_id")->fetch_assoc();
             
             $conn->query("UPDATE certificate SET status = '$new_status' WHERE certificate_id = $certificate_id");
+            log_activity($conn, get_user_id(), "Updated certificate {$cert_info['certificate_number']} status to $new_status", 1);
             $message = '<div class="alert alert-success">Certificate status updated to ' . strtoupper($new_status) . '</div>';
         }
     }
@@ -79,12 +83,12 @@ $certificates = $conn->query("SELECT c.*, ct.template_name, e.firstname, e.lastn
 <div class="container">
     <?php echo $message; ?>
     
-    <h1>📜 Certificate Generation & Management</h1>
+    <h1><i class="fas fa-certificate"></i> Certificate Generation & Management</h1>
     
     <!-- Certificate Templates -->
     <div class="card">
         <div class="card-header">
-            <h2>📋 Certificate Templates</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Certificate Templates</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddTemplateModal()" style="margin-bottom: 1rem;">Create New Template</button>

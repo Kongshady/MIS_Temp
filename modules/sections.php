@@ -53,7 +53,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY section_id DESC");
     
     <div class="card">
         <div class="card-header">
-            <h2>🏢 Section Management</h2>
+            <h2><i class="fas fa-building"></i> Section Management</h2>
         </div>
         
         <!-- Add New Section Form -->

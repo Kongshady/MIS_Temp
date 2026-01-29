@@ -16,6 +16,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("iis", $section_id, $item_type_id, $label);
             
             if ($stmt->execute()) {
+                $new_item_id = $conn->insert_id;
+                log_activity($conn, get_user_id(), "Added new item: $label (ID: $new_item_id)", 1);
                 $message = '<div class="alert alert-success">Item added successfully!</div>';
                 echo "<script>
                     setTimeout(function() {
@@ -23,6 +25,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     }, 100);
                 </script>";
             } else {
+                log_activity($conn, get_user_id(), "Failed to add item: $label", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'update') {
@@ -35,8 +38,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("iisi", $section_id, $item_type_id, $label, $item_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Updated item: $label (ID: $item_id)", 1);
                 $message = '<div class="alert alert-success">Item updated successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to update item ID: $item_id", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'delete') {
@@ -45,8 +50,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("i", $item_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Deleted item ID: $item_id", 1);
                 $message = '<div class="alert alert-success">Item deleted successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to delete item ID: $item_id", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         }
@@ -78,7 +85,7 @@ if ($search) {
     
     <div class="card">
         <div class="card-header">
-            <h2>📦 Item Management</h2>
+            <h2><i class="fas fa-box"></i> Item Management</h2>
         </div>
         
         <!-- Add New Item Form -->
@@ -102,15 +109,20 @@ if ($search) {
                 
                 <div class="form-group">
                     <label>Item Type *</label>
-                    <select name="item_type_id" class="form-control" required>
-                        <option value="">Select Item Type</option>
-                        <?php 
-                        $item_types = $conn->query("SELECT * FROM item_type");
-                        while($type = $item_types->fetch_assoc()): 
-                        ?>
-                            <option value="<?php echo $type['item_type_id']; ?>"><?php echo htmlspecialchars($type['label']); ?></option>
-                        <?php endwhile; ?>
-                    </select>
+                    <div class="custom-combobox">
+                        <input type="text" id="itemTypeSearch" class="form-control" placeholder="Select or search item type..." autocomplete="off" required>
+                        <input type="hidden" name="item_type_id" id="itemTypeValue" required>
+                        <div class="combobox-dropdown" id="itemTypeDropdown">
+                            <?php 
+                            $item_types = $conn->query("SELECT * FROM item_type");
+                            while($type = $item_types->fetch_assoc()): 
+                            ?>
+                                <div class="combobox-option" data-value="<?php echo $type['item_type_id']; ?>">
+                                    <?php echo htmlspecialchars($type['label']); ?>
+                                </div>
+                            <?php endwhile; ?>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -192,14 +204,20 @@ if ($search) {
             
             <div class="form-group">
                 <label>Item Type *</label>
-                <select name="item_type_id" id="edit_item_type_id" class="form-control" required>
-                    <?php 
-                    $item_types = $conn->query("SELECT * FROM item_type");
-                    while($type = $item_types->fetch_assoc()): 
-                    ?>
-                        <option value="<?php echo $type['item_type_id']; ?>"><?php echo htmlspecialchars($type['label']); ?></option>
-                    <?php endwhile; ?>
-                </select>
+                <div class="custom-combobox">
+                    <input type="text" id="editItemTypeSearch" class="form-control" placeholder="Select or search item type..." autocomplete="off" required>
+                    <input type="hidden" name="item_type_id" id="edit_item_type_id">
+                    <div class="combobox-dropdown" id="editItemTypeDropdown">
+                        <?php 
+                        $item_types = $conn->query("SELECT * FROM item_type");
+                        while($type = $item_types->fetch_assoc()): 
+                        ?>
+                            <div class="combobox-option" data-value="<?php echo $type['item_type_id']; ?>">
+                                <?php echo htmlspecialchars($type['label']); ?>
+                            </div>
+                        <?php endwhile; ?>
+                    </div>
+                </div>
             </div>
             
             <div class="form-group">
@@ -218,7 +236,7 @@ if ($search) {
 <!-- Delete Confirmation Modal -->
 <div id="deleteModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000;">
     <div style="background: white; width: 90%; max-width: 500px; margin: 100px auto; padding: 2rem; border-radius: 10px; text-align: center;">
-        <h3 style="color: #dc3545;">⚠️ Confirm Delete</h3>
+        <h3 style="color: #dc3545;"><i class="fas fa-exclamation-triangle"></i> Confirm Delete</h3>
         <p>Are you sure you want to delete this item?</p>
         <p><strong id="deleteItemName" style="color: #FFB6C1;"></strong></p>
         <p style="color: #666; font-size: 0.9rem;">This action cannot be undone.</p>
@@ -238,7 +256,19 @@ if ($search) {
 function editItem(item) {
     document.getElementById('edit_item_id').value = item.item_id;
     document.getElementById('edit_section_id').value = item.section_id;
-    document.getElementById('edit_item_type_id').value = item.item_type_id;
+    
+    // Set item type for custom combobox
+    const editItemTypeSearch = document.getElementById('editItemTypeSearch');
+    const editItemTypeValue = document.getElementById('edit_item_type_id');
+    const editOptions = document.querySelectorAll('#editItemTypeDropdown .combobox-option');
+    
+    editOptions.forEach(option => {
+        if (option.getAttribute('data-value') == item.item_type_id) {
+            editItemTypeSearch.value = option.textContent.trim();
+            editItemTypeValue.value = item.item_type_id;
+        }
+    });
+    
     document.getElementById('edit_label').value = item.label;
     document.getElementById('editModal').style.display = 'block';
 }
@@ -269,6 +299,134 @@ document.addEventListener('DOMContentLoaded', function() {
             }, 500);
         }, 3000);
     });
+});
+</script>
+
+<style>
+/* Custom Combobox Styling */
+.custom-combobox {
+    position: relative;
+}
+
+.custom-combobox input[type="text"] {
+    width: 100%;
+    cursor: pointer;
+}
+
+.combobox-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: white;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    max-height: 300px;
+    overflow-y: auto;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    z-index: 1000;
+    margin-top: 2px;
+}
+
+.combobox-dropdown.show {
+    display: block;
+}
+
+.combobox-option {
+    padding: 10px 15px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.combobox-option:hover {
+    background: #f0f0f0;
+}
+
+.combobox-option.selected {
+    background: #667eea;
+    color: white;
+}
+</style>
+
+<script>
+// Custom Combobox for Add Form
+const itemTypeSearch = document.getElementById('itemTypeSearch');
+const itemTypeValue = document.getElementById('itemTypeValue');
+const itemTypeDropdown = document.getElementById('itemTypeDropdown');
+
+if (itemTypeSearch) {
+    itemTypeSearch.addEventListener('focus', function() {
+        itemTypeDropdown.classList.add('show');
+    });
+
+    itemTypeSearch.addEventListener('input', function() {
+        const filter = this.value.toLowerCase();
+        const options = itemTypeDropdown.querySelectorAll('.combobox-option');
+        
+        options.forEach(option => {
+            const text = option.textContent.toLowerCase();
+            if (text.includes(filter)) {
+                option.style.display = 'block';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+        
+        itemTypeDropdown.classList.add('show');
+    });
+
+    itemTypeDropdown.querySelectorAll('.combobox-option').forEach(option => {
+        option.addEventListener('click', function() {
+            itemTypeSearch.value = this.textContent.trim();
+            itemTypeValue.value = this.getAttribute('data-value');
+            itemTypeDropdown.classList.remove('show');
+        });
+    });
+}
+
+// Custom Combobox for Edit Form
+const editItemTypeSearch = document.getElementById('editItemTypeSearch');
+const editItemTypeValue = document.getElementById('edit_item_type_id');
+const editItemTypeDropdown = document.getElementById('editItemTypeDropdown');
+
+if (editItemTypeSearch) {
+    editItemTypeSearch.addEventListener('focus', function() {
+        editItemTypeDropdown.classList.add('show');
+    });
+
+    editItemTypeSearch.addEventListener('input', function() {
+        const filter = this.value.toLowerCase();
+        const options = editItemTypeDropdown.querySelectorAll('.combobox-option');
+        
+        options.forEach(option => {
+            const text = option.textContent.toLowerCase();
+            if (text.includes(filter)) {
+                option.style.display = 'block';
+            } else {
+                option.style.display = 'none';
+            }
+        });
+        
+        editItemTypeDropdown.classList.add('show');
+    });
+
+    editItemTypeDropdown.querySelectorAll('.combobox-option').forEach(option => {
+        option.addEventListener('click', function() {
+            editItemTypeSearch.value = this.textContent.trim();
+            editItemTypeValue.value = this.getAttribute('data-value');
+            editItemTypeDropdown.classList.remove('show');
+        });
+    });
+}
+
+// Close dropdown when clicking outside
+document.addEventListener('click', function(e) {
+    if (!e.target.closest('.custom-combobox')) {
+        document.querySelectorAll('.combobox-dropdown').forEach(dropdown => {
+            dropdown.classList.remove('show');
+        });
+    }
 });
 </script>
 

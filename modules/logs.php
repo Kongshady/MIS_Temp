@@ -14,13 +14,14 @@ $logs = $conn->query("SELECT a.*, e.firstname, e.lastname, e.position
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h2>📝 Activity Logs</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Activity Logs</h2>
         </div>
         
         <?php if ($logs->num_rows > 0): ?>
             <table class="table">
                 <thead>
                     <tr>
+                        <th>#</th>
                         <th>Log ID</th>
                         <th>Employee</th>
                         <th>Position</th>
@@ -29,8 +30,12 @@ $logs = $conn->query("SELECT a.*, e.firstname, e.lastname, e.position
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($log = $logs->fetch_assoc()): ?>
+                    <?php 
+                    $row_number = 1;
+                    while($log = $logs->fetch_assoc()): 
+                    ?>
                         <tr>
+                            <td><?php echo $row_number++; ?></td>
                             <td><?php echo $log['activity_log_id']; ?></td>
                             <td><?php echo htmlspecialchars($log['firstname'] . ' ' . $log['lastname']); ?></td>
                             <td><?php echo htmlspecialchars($log['position']); ?></td>

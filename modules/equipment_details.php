@@ -19,6 +19,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("issii", $equipment_id, $frequency, $next_due_date, $responsible_employee_id, $responsible_section_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Added maintenance schedule for equipment ID: $equipment_id ($frequency)", 1);
                 $message = '<div class="alert alert-success">Maintenance schedule added!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -37,6 +38,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($next_maintenance_date) {
                     $conn->query("UPDATE maintenance_schedule SET next_due_date='$next_maintenance_date' WHERE equipment_id=$equipment_id");
                 }
+                log_activity($conn, get_user_id(), "Recorded $maintenance_type maintenance for equipment ID: $equipment_id", 1);
                 $message = '<div class="alert alert-success">Maintenance record added!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -75,7 +77,7 @@ $history = $conn->query("SELECT mh.*, e.firstname, e.lastname
     <!-- Equipment Information -->
     <div class="card">
         <div class="card-header">
-            <h2>🔧 Equipment Information</h2>
+            <h2><i class="fas fa-tools"></i> Equipment Information</h2>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
@@ -96,7 +98,7 @@ $history = $conn->query("SELECT mh.*, e.firstname, e.lastname
     <!-- Maintenance Schedule -->
     <div class="card">
         <div class="card-header">
-            <h2>📅 Maintenance Schedule</h2>
+            <h2><i class="fas fa-calendar-alt"></i> Maintenance Schedule</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddScheduleModal()" style="margin-bottom: 1rem;">Add Schedule</button>
@@ -137,7 +139,7 @@ $history = $conn->query("SELECT mh.*, e.firstname, e.lastname
     <!-- Maintenance History -->
     <div class="card">
         <div class="card-header">
-            <h2>📝 Maintenance History</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Maintenance History</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddHistoryModal()" style="margin-bottom: 1rem;">Record Maintenance</button>

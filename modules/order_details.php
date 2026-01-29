@@ -101,7 +101,7 @@ $tests = $conn->query("SELECT ot.*, t.label as test_name, s.label as section_nam
     <!-- Order Information -->
     <div class="card">
         <div class="card-header">
-            <h2>📋 Order #<?php echo $order['lab_test_order_id']; ?> Details</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Order #<?php echo $order['lab_test_order_id']; ?> Details</h2>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 8px;">
@@ -145,7 +145,7 @@ $tests = $conn->query("SELECT ot.*, t.label as test_name, s.label as section_nam
     <!-- Tests and Results -->
     <div class="card" style="margin-top: 2rem;">
         <div class="card-header">
-            <h2>🧪 Tests & Results</h2>
+            <h2><i class="fas fa-flask"></i> Tests & Results</h2>
         </div>
         
         <div style="display: grid; gap: 1.5rem;">
@@ -219,7 +219,7 @@ $tests = $conn->query("SELECT ot.*, t.label as test_name, s.label as section_nam
                         <!-- Add Result Form -->
                         <div style="background: #fff3cd; padding: 1rem; border-radius: 5px; border-left: 4px solid #ffc107;">
                             <p style="margin: 0 0 1rem 0; color: #856404;">
-                                <strong>⚠️ No result entered yet</strong>
+                                <strong><i class="fas fa-exclamation-triangle"></i> No result entered yet</strong>
                             </p>
                             <button class="btn btn-primary" onclick="showAddResultForm(<?php echo htmlspecialchars(json_encode($test)); ?>)">
                                 + Add Result

@@ -29,7 +29,7 @@ $history = $conn->query("SELECT cr.*, emp.firstname, emp.lastname
     <!-- Procedure Information -->
     <div class="card">
         <div class="card-header">
-            <h2>📋 Calibration Procedure Details</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Calibration Procedure Details</h2>
         </div>
         
         <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem;">
@@ -47,7 +47,7 @@ $history = $conn->query("SELECT cr.*, emp.firstname, emp.lastname
     <!-- Calibration History -->
     <div class="card">
         <div class="card-header">
-            <h2>📊 Calibration History</h2>
+            <h2><i class="fas fa-chart-bar"></i> Calibration History</h2>
         </div>
         
         <?php if ($history->num_rows > 0): ?>
@@ -85,7 +85,7 @@ $history = $conn->query("SELECT cr.*, emp.firstname, emp.lastname
     <!-- Statistics -->
     <div class="card">
         <div class="card-header">
-            <h2>📈 Calibration Statistics</h2>
+            <h2><i class="fas fa-chart-line"></i> Calibration Statistics</h2>
         </div>
         
         <?php

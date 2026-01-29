@@ -98,7 +98,7 @@ $history_table_exists = $tables && $tables->num_rows > 0;
     
     <?php if (!$price_column_exists || !$history_table_exists): ?>
         <div class="alert alert-warning">
-            <strong>⚠️ Database Setup Required!</strong><br>
+            <strong><i class="fas fa-exclamation-triangle"></i> Database Setup Required!</strong><br>
             The pricing features require database changes. Please run the SQL migration file:
             <code>sql/test_pricing.sql</code> in phpMyAdmin.
             <?php if (!$price_column_exists): ?>
@@ -112,7 +112,7 @@ $history_table_exists = $tables && $tables->num_rows > 0;
     
     <div class="card">
         <div class="card-header">
-            <h2>🧪 Test Management</h2>
+            <h2><i class="fas fa-flask"></i> Test Management</h2>
         </div>
         
         <!-- Add New Test Form -->

@@ -20,6 +20,28 @@ if (session_status() === PHP_SESSION_NONE) {
 }
 
 /**
+ * Log activity to database
+ * @param object $conn Database connection
+ * @param int $employee_id Employee ID performing the action
+ * @param string $description Activity description
+ * @param int $status_code 1 for success, 0 for failure/error
+ */
+function log_activity($conn, $employee_id, $description, $status_code = 1) {
+    if (!$conn) {
+        return false;
+    }
+    
+    $stmt = $conn->prepare("INSERT INTO activity_log (employee_id, description, datetime_added, status_code) VALUES (?, ?, NOW(), ?)");
+    if ($stmt) {
+        $stmt->bind_param("isi", $employee_id, $description, $status_code);
+        $stmt->execute();
+        $stmt->close();
+        return true;
+    }
+    return false;
+}
+
+/**
  * Check if user is logged in
  * @return bool
  */
@@ -42,7 +64,7 @@ function require_login($redirect_to = null) {
         }
         
         // Redirect to login
-        header('Location: /mis_project/login.php');
+        header('Location: /Proto/MIS_Temp/login.php');
         exit();
     }
 }
@@ -306,7 +328,7 @@ function show_access_denied($permission_key) {
     </head>
     <body>
         <div class="access-denied-container">
-            <div class="icon-container">🚫</div>
+            <div class="icon-container"><i class="fas fa-ban"></i></div>
             <h1>Access Denied</h1>
             <div class="error-code">Error 403 - Forbidden</div>
             <p class="message">
@@ -329,7 +351,7 @@ function show_access_denied($permission_key) {
             
             <div class="buttons">
                 <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
-                <a href="/mis_project/modules/dashboard.php" class="btn btn-primary">Go to Dashboard</a>
+                <a href="/Proto/MIS_Temp/modules/dashboard.php" class="btn btn-primary">Go to Dashboard</a>
             </div>
         </div>
     </body>
@@ -424,7 +446,7 @@ function logout_user() {
     session_destroy();
     
     // Redirect to login
-    header('Location: /mis_project/login.php');
+    header('Location: /Proto/MIS_Temp/login.php');
     exit();
 }
 
@@ -436,92 +458,92 @@ function get_accessible_menu() {
     $all_menu_items = [
         [
             'label' => 'Dashboard',
-            'url' => '/mis_project/modules/dashboard.php',
-            'icon' => '🏠',
+            'url' => '/Proto/MIS_Temp/modules/dashboard.php',
+            'icon' => '<i class="fa-solid fa-gauge"></i>',
             'permission' => null // Everyone can access
         ],
         [
             'label' => 'Patients',
-            'url' => '/mis_project/modules/patients.php',
-            'icon' => '👥',
+            'url' => '/Proto/MIS_Temp/modules/patients.php',
+            'icon' => '<i class="fa-solid fa-users"></i>',
             'permission' => 'patients.view'
         ],
         [
             'label' => 'Physicians',
-            'url' => '/mis_project/modules/physicians.php',
-            'icon' => '👨‍⚕️',
+            'url' => '/Proto/MIS_Temp/modules/physicians.php',
+            'icon' => '<i class="fa-solid fa-user-doctor"></i>',
             'permission' => 'physicians.view'
         ],
         [
             'label' => 'Lab Results',
-            'url' => '/mis_project/modules/lab_results.php',
-            'icon' => '🔬',
+            'url' => '/Proto/MIS_Temp/modules/lab_results.php',
+            'icon' => '<i class="fa-solid fa-microscope"></i>',
             'permission' => 'lab_results.view'
         ],
         [
             'label' => 'Tests',
-            'url' => '/mis_project/modules/tests.php',
-            'icon' => '🧪',
+            'url' => '/Proto/MIS_Temp/modules/tests.php',
+            'icon' => '<i class="fa-solid fa-flask"></i>',
             'permission' => 'tests.manage'
         ],
         [
             'label' => 'Sections',
-            'url' => '/mis_project/modules/sections.php',
-            'icon' => '🏢',
+            'url' => '/Proto/MIS_Temp/modules/sections.php',
+            'icon' => '<i class="fa-solid fa-building"></i>',
             'permission' => 'sections.manage'
         ],
         [
             'label' => 'Employees',
-            'url' => '/mis_project/modules/employees.php',
-            'icon' => '👨‍💼',
+            'url' => '/Proto/MIS_Temp/modules/employees.php',
+            'icon' => '<i class="fa-solid fa-user-tie"></i>',
             'permission' => 'employees.view'
         ],
         [
             'label' => 'Transactions',
-            'url' => '/mis_project/modules/transactions.php',
-            'icon' => '📝',
+            'url' => '/Proto/MIS_Temp/modules/transactions.php',
+            'icon' => '<i class="fa-solid fa-file-invoice"></i>',
             'permission' => 'transactions.view'
         ],
         [
             'label' => 'Items',
-            'url' => '/mis_project/modules/items.php',
-            'icon' => '📦',
+            'url' => '/Proto/MIS_Temp/modules/items.php',
+            'icon' => '<i class="fa-solid fa-box"></i>',
             'permission' => 'items.view'
         ],
         [
             'label' => 'Inventory',
-            'url' => '/mis_project/modules/inventory.php',
-            'icon' => '📊',
+            'url' => '/Proto/MIS_Temp/modules/inventory.php',
+            'icon' => '<i class="fa-solid fa-warehouse"></i>',
             'permission' => 'inventory.view'
         ],
         [
             'label' => 'Equipment',
-            'url' => '/mis_project/modules/equipment.php',
-            'icon' => '🔧',
+            'url' => '/Proto/MIS_Temp/modules/equipment.php',
+            'icon' => '<i class="fa-solid fa-wrench"></i>',
             'permission' => 'equipment.view'
         ],
         [
             'label' => 'Calibration',
-            'url' => '/mis_project/modules/calibration.php',
-            'icon' => '⚖️',
+            'url' => '/Proto/MIS_Temp/modules/calibration.php',
+            'icon' => '<i class="fa-solid fa-scale-balanced"></i>',
             'permission' => 'calibration.view'
         ],
         [
             'label' => 'Certificates',
-            'url' => '/mis_project/modules/certificates.php',
-            'icon' => '📜',
+            'url' => '/Proto/MIS_Temp/modules/certificates.php',
+            'icon' => '<i class="fa-solid fa-certificate"></i>',
             'permission' => 'certificates.view'
         ],
         [
             'label' => 'Reports',
-            'url' => '/mis_project/reports/compliance_reports.php',
-            'icon' => '📈',
+            'url' => '/Proto/MIS_Temp/reports/compliance_reports.php',
+            'icon' => '<i class="fa-solid fa-chart-line"></i>',
             'permission' => 'reports.view'
         ],
         [
             'label' => 'Activity Logs',
-            'url' => '/mis_project/modules/logs.php',
-            'icon' => '📋',
+            'url' => '/Proto/MIS_Temp/modules/logs.php',
+            'icon' => '<i class="fa-solid fa-clipboard-list"></i>',
             'permission' => 'logs.view'
         ],
     ];

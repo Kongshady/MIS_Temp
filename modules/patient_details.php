@@ -152,7 +152,7 @@ $lab_results = $conn->query("SELECT lr.*, t.label as test_name, e.firstname, e.l
     <!-- Laboratory Test Results -->
     <div class="card">
         <div class="card-header">
-            <h2>🔬 Laboratory Test Results</h2>
+            <h2><i class="fas fa-microscope"></i> Laboratory Test Results</h2>
         </div>
         <?php if ($lab_results && $lab_results->num_rows > 0): ?>
             <table class="table">

@@ -20,6 +20,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("iiissss", $item_id, $quantity, $performed_by, $supplier, $reference_number, $expiry_date, $remarks);
             
             if ($stmt->execute()) {
+                $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
+                log_activity($conn, get_user_id(), "Added stock: $quantity unit(s) of $item_name (Item ID: $item_id)", 1);
                 $message = '<div class="alert alert-success">Stock added successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -48,6 +50,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $stmt->bind_param("iiiss", $item_id, $quantity, $performed_by, $reference_number, $remarks);
                 
                 if ($stmt->execute()) {
+                    $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
+                    log_activity($conn, get_user_id(), "Removed stock: $quantity unit(s) of $item_name (Item ID: $item_id)", 1);
                     $message = '<div class="alert alert-success">Stock removed successfully!</div>';
                 } else {
                     $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -83,6 +87,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                     // Also create stock_out record
                     $performed_by = $_SESSION['user_id'] ?? 1;
                     $conn->query("INSERT INTO stock_out (item_id, quantity, performed_by, remarks, datetime_added) VALUES ($item_id, $quantity, $performed_by, 'Used by: $or_number - $purpose', NOW())");
+                    $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
+                    $user_name = $emp['firstname'] . ' ' . $emp['lastname'];
+                    log_activity($conn, get_user_id(), "Recorded stock usage: $quantity unit(s) of $item_name by $user_name (OR: $or_number)", 1);
                     $message = '<div class="alert alert-success">Stock usage recorded successfully!</div>';
                 } else {
                     $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -181,7 +188,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
     
     <div class="card">
         <div class="card-header">
-            <h2>📦 Inventory & Supplies Management</h2>
+            <h2><i class="fas fa-warehouse"></i> Inventory & Supplies Management</h2>
         </div>
         
         <!-- Summary Statistics -->
@@ -211,7 +218,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
         
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
             <a href="inventory.php" class="btn btn-primary">Stock Management</a>
-            <a href="inventory_reports.php" class="btn btn-secondary">📊 View Reports</a>
+            <a href="inventory_reports.php" class="btn btn-secondary"><i class="fas fa-chart-bar"></i> View Reports</a>
         </div>
     </div>
     
@@ -265,7 +272,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
     <?php if ($low_stock_alerts && $low_stock_alerts->num_rows > 0): ?>
     <div class="card" style="border-left: 4px solid #f44336;">
         <div class="card-header" style="background-color: #ffebee;">
-            <h2>⚠️ Low Stock Alerts</h2>
+            <h2><i class="fas fa-exclamation-triangle"></i> Low Stock Alerts</h2>
         </div>
         
         <table class="table">
@@ -303,7 +310,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
     
     <div class="card">
         <div class="card-header">
-            <h2>📋 Stock Management</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Stock Management</h2>
         </div>
         
         <!-- Tab Navigation -->
@@ -315,7 +322,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                 ➖ Stock Out
             </button>
             <button class="tab-btn" onclick="switchTab('stock-usage')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
-                📝 Stock Usage
+                <i class="fas fa-minus-circle"></i> Stock Usage
             </button>
         </div>
         
@@ -410,7 +417,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
             
             <!-- Stock Usage Form - Blue Theme -->
             <div id="stock-usage" class="tab-content" style="display: none; border: 2px solid #2196F3; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e3f2fd 0%, white 100%);">
-                <h3 style="color: #2196F3; margin-bottom: 1rem;">📝 Record Usage</h3>
+                <h3 style="color: #2196F3; margin-bottom: 1rem;"><i class="fas fa-minus-circle"></i> Record Usage</h3>
                 <form method="POST" id="usageForm" onsubmit="return confirmUsage()">
                     <input type="hidden" name="action" value="stock_usage">
                     
@@ -571,7 +578,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                             $row_style = 'style="background-color: #fff3e0;"';
                             $status_badge = '<span class="badge badge-warning">🟠 LOW STOCK</span>';
                         } else {
-                            $status_badge = '<span class="badge badge-success">✅ IN STOCK</span>';
+                            $status_badge = '<span class="badge badge-success"><i class="fas fa-check-circle"></i> IN STOCK</span>';
                         }
                     ?>
                         <tr <?php echo $row_style; ?>>
@@ -612,7 +619,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
     
     <div class="card">
         <div class="card-header">
-            <h3>📋 Recent Stock Movements</h3>
+            <h3><i class="fas fa-clipboard-list"></i> Recent Stock Movements</h3>
         </div>
         
         <?php if ($recent_movements->num_rows > 0): ?>

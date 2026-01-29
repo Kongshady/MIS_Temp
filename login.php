@@ -12,7 +12,7 @@ require_once 'includes/auth.php';
 
 // If already logged in, redirect to dashboard
 if (is_logged_in()) {
-    header('Location: /mis_project/modules/dashboard.php');
+    header('Location: /Proto/MIS_Temp/modules/dashboard.php');
     exit();
 }
 
@@ -58,16 +58,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
                     // Successful login - load permissions
                     if (load_user_permissions($conn, $user['employee_id'])) {
                         // Log successful login
-                        $log_stmt = $conn->prepare("INSERT INTO activity_log (employee_id, description, datetime_added, status_code) VALUES (?, ?, NOW(), 1)");
-                        if ($log_stmt) {
-                            $description = 'User logged in successfully';
-                            $log_stmt->bind_param("is", $user['employee_id'], $description);
-                            $log_stmt->execute();
-                            $log_stmt->close();
-                        }
+                        log_activity($conn, $user['employee_id'], 'User logged in successfully', 1);
                         
                         // Redirect to intended page or dashboard
-                        $redirect = $_SESSION['redirect_after_login'] ?? '/mis_project/modules/dashboard.php';
+                        $redirect = $_SESSION['redirect_after_login'] ?? '/Proto/MIS_Temp/modules/dashboard.php';
                         unset($_SESSION['redirect_after_login']);
                         header('Location: ' . $redirect);
                         exit();
@@ -76,12 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
                     }
                 } else {
                     // Invalid password - log failed attempt
-                    $log_stmt = $conn->prepare("INSERT INTO activity_log (employee_id, description, datetime_added, status_code) VALUES (?, ?, NOW(), 0)");
-                    if ($log_stmt) {
-                        $description = "Failed login attempt for username: $username";
-                        $log_stmt->bind_param("is", $user['employee_id'], $description);
-                        $log_stmt->execute();
-                        $log_stmt->close();
+                    if (isset($user['employee_id'])) {
+                        log_activity($conn, $user['employee_id'], 'Failed login attempt - incorrect password', 0);
                     }
                     $error = 'Invalid username or password.';
                 }

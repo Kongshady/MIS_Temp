@@ -15,26 +15,30 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $password_hash = password_hash($_POST['password'], PASSWORD_BCRYPT);
             $position = $_POST['position'];
             $status_code = 1; // Always set to Active when adding new employee
-            $role_id = isset($_POST['role_id']) ? $_POST['role_id'] : null;
+            $role_id = isset($_POST['role_id']) && $_POST['role_id'] !== '' ? $_POST['role_id'] : null;
+            $section_id = isset($_POST['section_id']) && $_POST['section_id'] !== '' ? $_POST['section_id'] : null;
             
-            $stmt = $conn->prepare("INSERT INTO employee (firstname, middlename, lastname, username, password_hash, position, role_id, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("ssssssii", $firstname, $middlename, $lastname, $username, $password_hash, $position, $role_id, $status_code);
+            $stmt = $conn->prepare("INSERT INTO employee (section_id, firstname, middlename, lastname, username, password_hash, position, role_id, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("issssssii", $section_id, $firstname, $middlename, $lastname, $username, $password_hash, $position, $role_id, $status_code);
             
             if ($stmt->execute()) {
+                $new_employee_id = $conn->insert_id;
+                log_activity($conn, get_user_id(), "Added new employee: $firstname $lastname (ID: $new_employee_id)", 1);
                 $message = '<div class="alert alert-success">Employee added successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to add employee: $firstname $lastname", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'update') {
             $employee_id = $_POST['employee_id'];
-            $section_id = $_POST['section_id'];
+            $section_id = isset($_POST['section_id']) && $_POST['section_id'] !== '' ? $_POST['section_id'] : null;
             $firstname = $_POST['firstname'];
             $middlename = $_POST['middlename'];
             $lastname = $_POST['lastname'];
             $username = $_POST['username'];
             $position = $_POST['position'];
             $status_code = $_POST['status_code'];
-            $role_id = isset($_POST['role_id']) ? $_POST['role_id'] : null;
+            $role_id = isset($_POST['role_id']) && $_POST['role_id'] !== '' ? $_POST['role_id'] : null;
             
             // Update password only if provided
             if (!empty($_POST['password'])) {
@@ -47,8 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Updated employee: $firstname $lastname (ID: $employee_id)", 1);
                 $message = '<div class="alert alert-success">Employee updated successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to update employee ID: $employee_id", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'delete') {
@@ -59,8 +65,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("i", $employee_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Deleted/deactivated employee ID: $employee_id", 1);
                 $message = '<div class="alert alert-success">Employee deleted successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to delete employee ID: $employee_id", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         }
@@ -117,7 +125,7 @@ $employees = $conn->query($query);
     
     <div class="card">
         <div class="card-header">
-            <h2>👥 Employee/User Management</h2>
+            <h2><i class="fas fa-user-tie"></i> Employee/User Management</h2>
         </div>
         
         <!-- Add New Employee Form -->
@@ -154,6 +162,23 @@ $employees = $conn->query($query);
                 <div class="form-group">
                     <label>Position *</label>
                     <input type="text" name="position" class="form-control" required>
+                </div>
+                
+                <div class="form-group">
+                    <label>Section</label>
+                    <select name="section_id" class="form-control">
+                        <option value="">Select Section (Optional)</option>
+                        <?php 
+                        $sections_add = $conn->query("SELECT * FROM section ORDER BY label");
+                        if ($sections_add) {
+                            while($section = $sections_add->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>
+                        <?php 
+                            endwhile;
+                        }
+                        ?>
+                    </select>
                 </div>
                 
                 <div class="form-group">

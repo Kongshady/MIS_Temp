@@ -167,7 +167,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
     
     <div class="card">
         <div class="card-header">
-            <h2>🔬 Laboratory Test Orders & Results</h2>
+            <h2><i class="fas fa-microscope"></i> Laboratory Test Orders & Results</h2>
         </div>
         
         <!-- Action Buttons -->
@@ -305,7 +305,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
             </div>
         <?php else: ?>
             <div class="alert alert-info">
-                <strong>ℹ️ No orders found.</strong> 
+                <strong><i class="fas fa-info-circle"></i> No orders found.</strong> 
                 <a href="#" onclick="showCreateOrderModal(); return false;">Create a new test order</a> to get started.
             </div>
         <?php endif; ?>

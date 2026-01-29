@@ -20,7 +20,7 @@ $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 ORDER BY
 <div class="container">
     <div class="card">
         <div class="card-header">
-            <h2>📊 Inventory Reports</h2>
+            <h2><i class="fas fa-chart-bar"></i> Inventory Reports</h2>
         </div>
         
         <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">

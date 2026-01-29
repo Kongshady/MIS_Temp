@@ -145,7 +145,7 @@ $age = date_diff(date_create($patient['birthdate']), date_create('now'))->y;
     <!-- Laboratory Results -->
     <div class="card">
         <div class="card-header">
-            <h2>🧪 Laboratory Test Results</h2>
+            <h2><i class="fas fa-flask"></i> Laboratory Test Results</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddResultModal()" style="margin-bottom: 1rem;">Add Result</button>

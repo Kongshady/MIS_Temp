@@ -18,8 +18,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("ssssi", $physician_name, $specialization, $contact_number, $email, $status_code);
             
             if ($stmt->execute()) {
+                $new_physician_id = $conn->insert_id;
+                log_activity($conn, get_user_id(), "Added new physician: $physician_name (ID: $new_physician_id)", 1);
                 $message = '<div class="alert alert-success">Physician added successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to add physician: $physician_name", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'update') {
@@ -34,8 +37,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("ssssii", $physician_name, $specialization, $contact_number, $email, $status_code, $physician_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Updated physician: $physician_name (ID: $physician_id)", 1);
                 $message = '<div class="alert alert-success">Physician updated successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to update physician ID: $physician_id", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'delete') {
@@ -44,8 +49,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("i", $physician_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Deleted physician ID: $physician_id", 1);
                 $message = '<div class="alert alert-success">Physician deleted successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to delete physician ID: $physician_id", 0);
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         }
@@ -61,7 +68,7 @@ $physicians = $conn->query("SELECT p.*, s.label as status_label FROM physician p
     
     <div class="card">
         <div class="card-header">
-            <h2>👨‍⚕️ Physician Management</h2>
+            <h2><i class="fas fa-user-md"></i> Physician Management</h2>
         </div>
         
         <!-- Add New Physician Form -->

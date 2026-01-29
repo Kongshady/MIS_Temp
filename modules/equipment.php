@@ -21,6 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("sssissss", $name, $model, $serial_no, $section_id, $status, $purchase_date, $supplier, $remarks);
             
             if ($stmt->execute()) {
+                $equipment_id = $stmt->insert_id;
+                log_activity($conn, get_user_id(), "Added new equipment: $name - $model (ID: $equipment_id)", 1);
                 $message = '<div class="alert alert-success">Equipment added successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -40,16 +42,19 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("sssissssi", $name, $model, $serial_no, $section_id, $status, $purchase_date, $supplier, $remarks, $equipment_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Updated equipment: $name - $model (ID: $equipment_id)", 1);
                 $message = '<div class="alert alert-success">Equipment updated successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'delete_equipment') {
             $equipment_id = $_POST['equipment_id'];
+            $equipment_info = $conn->query("SELECT name, model FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc();
             $stmt = $conn->prepare("DELETE FROM equipment WHERE equipment_id=?");
             $stmt->bind_param("i", $equipment_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Deleted equipment: {$equipment_info['name']} - {$equipment_info['model']} (ID: $equipment_id)", 1);
                 $message = '<div class="alert alert-success">Equipment deleted successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -65,6 +70,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("issii", $equipment_id, $frequency, $next_due_date, $responsible_employee_id, $responsible_section_id);
             
             if ($stmt->execute()) {
+                $equipment_name = $conn->query("SELECT name FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc()['name'];
+                log_activity($conn, get_user_id(), "Added $frequency maintenance schedule for $equipment_name (ID: $equipment_id)", 1);
                 $message = '<div class="alert alert-success">Maintenance schedule added successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -85,6 +92,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 if ($next_maintenance_date) {
                     $conn->query("UPDATE maintenance_schedule SET next_due_date='$next_maintenance_date' WHERE equipment_id=$equipment_id");
                 }
+                $equipment_name = $conn->query("SELECT name FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc()['name'];
+                log_activity($conn, get_user_id(), "Recorded $maintenance_type maintenance for $equipment_name (ID: $equipment_id)", 1);
                 $message = '<div class="alert alert-success">Maintenance history recorded successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -104,6 +113,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("isssissss", $equipment_id, $date_used, $user_name, $item_name, $quantity, $purpose, $or_number, $status, $remarks);
             
             if ($stmt->execute()) {
+                $equipment_name = $conn->query("SELECT name FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc()['name'];
+                log_activity($conn, get_user_id(), "Recorded usage of $equipment_name by $user_name - $item_name (Qty: $quantity)", 1);
                 $message = '<div class="alert alert-success">Equipment usage recorded successfully!</div>';
             } else {
                 $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
@@ -167,7 +178,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
     <!-- Alerts Section -->
     <div class="card">
         <div class="card-header">
-            <h2>⚠️ Maintenance Alerts</h2>
+            <h2><i class="fas fa-exclamation-triangle"></i> Maintenance Alerts</h2>
         </div>
         
         <!-- Status Legend -->
@@ -245,7 +256,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
     <!-- Equipment Usage/Borrowing -->
     <div class="card">
         <div class="card-header">
-            <h2>📋 Equipment Usage Records</h2>
+            <h2><i class="fas fa-clipboard-list"></i> Equipment Usage Records</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddUsageModal()" style="margin-bottom: 1rem;">Record Equipment Usage</button>
@@ -291,7 +302,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
     <!-- Equipment Management -->
     <div class="card">
         <div class="card-header">
-            <h2>🔧 Equipment Management</h2>
+            <h2><i class="fas fa-tools"></i> Equipment Management</h2>
         </div>
         
         <button class="btn btn-success" onclick="showAddEquipmentModal()" style="margin-bottom: 1rem;">Add Equipment</button>

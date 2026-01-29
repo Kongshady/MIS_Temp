@@ -190,7 +190,7 @@ if ($export == 'csv' && $report_data) {
 ?>
 
 <div class="container">
-    <h1>📊 Audit & Compliance Reports</h1>
+    <h1><i class="fas fa-chart-bar"></i> Audit & Compliance Reports</h1>
     
     <!-- Report Generator -->
     <div class="card">

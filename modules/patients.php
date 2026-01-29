@@ -22,8 +22,11 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("ssssssssi", $patient_type, $firstname, $middlename, $lastname, $birthdate, $gender, $contact_number, $address, $status_code);
             
             if ($stmt->execute()) {
+                $new_patient_id = $conn->insert_id;
+                log_activity($conn, get_user_id(), "Added new patient: $firstname $lastname (ID: $new_patient_id)", 1);
                 $message = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Patient added successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to add patient: $firstname $lastname", 0);
                 $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'update') {
@@ -41,8 +44,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("ssssssssi", $patient_type, $firstname, $middlename, $lastname, $birthdate, $gender, $contact_number, $address, $patient_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Updated patient: $firstname $lastname (ID: $patient_id)", 1);
                 $message = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Patient updated successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to update patient ID: $patient_id", 0);
                 $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Error: ' . $stmt->error . '</div>';
             }
         } elseif ($_POST['action'] == 'delete') {
@@ -51,8 +56,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $stmt->bind_param("i", $patient_id);
             
             if ($stmt->execute()) {
+                log_activity($conn, get_user_id(), "Deactivated patient ID: $patient_id", 1);
                 $message = '<div class="alert alert-success"><i class="fas fa-check-circle"></i> Patient deactivated successfully!</div>';
             } else {
+                log_activity($conn, get_user_id(), "Failed to deactivate patient ID: $patient_id", 0);
                 $message = '<div class="alert alert-danger"><i class="fas fa-exclamation-circle"></i> Error: ' . $stmt->error . '</div>';
             }
         }
@@ -81,7 +88,7 @@ $patients = $conn->query("SELECT p.*
     
     <div class="card">
         <div class="card-header">
-            <h2>👥 Patient Profile Management</h2>
+            <h2><i class="fas fa-users"></i> Patient Profile Management</h2>
         </div>
         
         <!-- Add New Patient Form -->
