@@ -10,23 +10,58 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         if ($_POST['action'] == 'add') {
             $section_id = $_POST['section_id'];
             $item_type_id = $_POST['item_type_id'];
+            $item_type_text = $_POST['item_type_text'] ?? '';
             $label = $_POST['label'];
             
-            $stmt = $conn->prepare("INSERT INTO item (section_id, item_type_id, label) VALUES (?, ?, ?)");
-            $stmt->bind_param("iis", $section_id, $item_type_id, $label);
+            // If item_type_id is empty or "new", create a new item type
+            if (empty($item_type_id) || $item_type_id === 'new') {
+                if (!empty($item_type_text)) {
+                    // Check if item type already exists
+                    $check_stmt = $conn->prepare("SELECT item_type_id FROM item_type WHERE label = ?");
+                    $check_stmt->bind_param("s", $item_type_text);
+                    $check_stmt->execute();
+                    $result = $check_stmt->get_result();
+                    
+                    if ($result->num_rows > 0) {
+                        // Use existing item type
+                        $row = $result->fetch_assoc();
+                        $item_type_id = $row['item_type_id'];
+                    } else {
+                        // Create new item type
+                        $type_stmt = $conn->prepare("INSERT INTO item_type (label) VALUES (?)");
+                        $type_stmt->bind_param("s", $item_type_text);
+                        if ($type_stmt->execute()) {
+                            $item_type_id = $conn->insert_id;
+                            log_activity($conn, get_user_id(), "Auto-created new item type: $item_type_text (ID: $item_type_id)", 1);
+                        } else {
+                            $message = '<div class="alert alert-danger">Error creating item type: ' . $type_stmt->error . '</div>';
+                            $item_type_id = null;
+                        }
+                    }
+                } else {
+                    $message = '<div class="alert alert-danger">Please select or enter an item type.</div>';
+                    $item_type_id = null;
+                }
+            }
             
-            if ($stmt->execute()) {
-                $new_item_id = $conn->insert_id;
-                log_activity($conn, get_user_id(), "Added new item: $label (ID: $new_item_id)", 1);
-                $message = '<div class="alert alert-success">Item added successfully!</div>';
-                echo "<script>
-                    setTimeout(function() {
-                        document.querySelector('form[action=\"\"]').reset();
-                    }, 100);
-                </script>";
-            } else {
-                log_activity($conn, get_user_id(), "Failed to add item: $label", 0);
-                $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
+            // Only proceed if we have a valid item_type_id
+            if ($item_type_id) {
+                $stmt = $conn->prepare("INSERT INTO item (section_id, item_type_id, label) VALUES (?, ?, ?)");
+                $stmt->bind_param("iis", $section_id, $item_type_id, $label);
+                
+                if ($stmt->execute()) {
+                    $new_item_id = $conn->insert_id;
+                    log_activity($conn, get_user_id(), "Added new item: $label (ID: $new_item_id)", 1);
+                    $message = '<div class="alert alert-success">Item added successfully!</div>';
+                    echo "<script>
+                        setTimeout(function() {
+                            document.querySelector('form[action=\"\"]').reset();
+                        }, 100);
+                    </script>";
+                } else {
+                    log_activity($conn, get_user_id(), "Failed to add item: $label", 0);
+                    $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
+                }
             }
         } elseif ($_POST['action'] == 'update') {
             $item_id = $_POST['item_id'];
@@ -60,23 +95,71 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get search parameter
+// Get filter and pagination parameters
 $search = isset($_GET['search']) ? $_GET['search'] : '';
+$section_filter = isset($_GET['section']) ? $_GET['section'] : '';
+$item_type_filter = isset($_GET['item_type']) ? $_GET['item_type'] : '';
+$rows_per_page = isset($_GET['rows']) && $_GET['rows'] !== 'all' ? (int)$_GET['rows'] : 0;
 
-// Get all items with search
+// Build query with filters
 $query = "SELECT i.*, s.label as section_name, it.label as item_type_name 
           FROM item i 
           LEFT JOIN section s ON i.section_id = s.section_id 
-          LEFT JOIN item_type it ON i.item_type_id = it.item_type_id";
+          LEFT JOIN item_type it ON i.item_type_id = it.item_type_id
+          WHERE 1=1";
+$conditions = [];
+$params = [];
+$types = '';
 
-if ($search) {
+if (!empty($search)) {
+    $conditions[] = "(i.label LIKE ? OR s.label LIKE ? OR it.label LIKE ?)";
     $search_param = "%$search%";
-    $stmt = $conn->prepare("$query WHERE i.label LIKE ? OR s.label LIKE ? OR it.label LIKE ? ORDER BY i.item_id DESC");
-    $stmt->bind_param("sss", $search_param, $search_param, $search_param);
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $types .= 'sss';
+}
+
+if (!empty($section_filter)) {
+    $conditions[] = "i.section_id = ?";
+    $params[] = $section_filter;
+    $types .= 'i';
+}
+
+if (!empty($item_type_filter)) {
+    $conditions[] = "i.item_type_id = ?";
+    $params[] = $item_type_filter;
+    $types .= 'i';
+}
+
+if (!empty($conditions)) {
+    $query .= " AND " . implode(" AND ", $conditions);
+}
+
+$query .= " ORDER BY i.item_id DESC";
+
+if (!empty($params)) {
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param($types, ...$params);
     $stmt->execute();
     $items = $stmt->get_result();
 } else {
-    $items = $conn->query("$query ORDER BY i.item_id DESC");
+    $items = $conn->query($query);
+}
+
+// Apply pagination if needed
+if ($rows_per_page > 0) {
+    $all_items = [];
+    while ($row = $items->fetch_assoc()) {
+        $all_items[] = $row;
+    }
+    $displayed_items = array_slice($all_items, 0, $rows_per_page);
+} else {
+    $all_items = [];
+    while ($row = $items->fetch_assoc()) {
+        $all_items[] = $row;
+    }
+    $displayed_items = $all_items;
 }
 ?>
 
@@ -110,11 +193,12 @@ if ($search) {
                 <div class="form-group">
                     <label>Item Type *</label>
                     <div class="custom-combobox">
-                        <input type="text" id="itemTypeSearch" class="form-control" placeholder="Select or search item type..." autocomplete="off" required>
-                        <input type="hidden" name="item_type_id" id="itemTypeValue" required>
+                        <input type="text" id="itemTypeSearch" class="form-control" placeholder="Select or type new item type..." autocomplete="off" required>
+                        <input type="hidden" name="item_type_id" id="itemTypeValue">
+                        <input type="hidden" name="item_type_text" id="itemTypeText">
                         <div class="combobox-dropdown" id="itemTypeDropdown">
                             <?php 
-                            $item_types = $conn->query("SELECT * FROM item_type");
+                            $item_types = $conn->query("SELECT * FROM item_type ORDER BY label");
                             while($type = $item_types->fetch_assoc()): 
                             ?>
                                 <div class="combobox-option" data-value="<?php echo $type['item_type_id']; ?>">
@@ -123,6 +207,7 @@ if ($search) {
                             <?php endwhile; ?>
                         </div>
                     </div>
+                    <small class="form-text text-muted">Select from list or type a new item type</small>
                 </div>
                 
                 <div class="form-group">
@@ -134,15 +219,57 @@ if ($search) {
             <button type="submit" class="btn btn-primary">Add Item</button>
         </form>
         
-        <!-- Search Bar -->
+        <!-- Filter Section -->
         <form method="GET" style="margin-bottom: 1rem;">
-            <div style="display: flex; gap: 1rem; align-items: center;">
-                <input type="text" name="search" class="form-control" placeholder="Search by item name, section, or type..." 
-                       value="<?php echo htmlspecialchars($search); ?>" style="flex: 1;">
-                <button type="submit" class="btn btn-primary">
-                    <i class="fas fa-search"></i> Search
-                </button>
-                <?php if ($search): ?>
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 150px auto auto; gap: 0.75rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Search by item name, section, or type..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Section</label>
+                    <select name="section" class="form-control">
+                        <option value="">All Sections</option>
+                        <?php 
+                        $sections_filter = $conn->query("SELECT * FROM section ORDER BY label");
+                        while($sec = $sections_filter->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $sec['section_id']; ?>" <?php echo $section_filter == $sec['section_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($sec['label']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Item Type</label>
+                    <select name="item_type" class="form-control">
+                        <option value="">All Types</option>
+                        <?php 
+                        $types_filter = $conn->query("SELECT * FROM item_type ORDER BY label");
+                        while($type = $types_filter->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $type['item_type_id']; ?>" <?php echo $item_type_filter == $type['item_type_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($type['label']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Rows</label>
+                    <select name="rows" class="form-control">
+                        <option value="10" <?php echo $rows_per_page == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="25" <?php echo $rows_per_page == 25 ? 'selected' : ''; ?>>25</option>
+                        <option value="50" <?php echo $rows_per_page == 50 ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo $rows_per_page == 100 ? 'selected' : ''; ?>>100</option>
+                        <option value="all" <?php echo $rows_per_page == 0 ? 'selected' : ''; ?>>All</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+                <?php if ($search || $section_filter || $item_type_filter || (isset($_GET['rows']) && $_GET['rows'] != 10)): ?>
                     <a href="items.php" class="btn btn-secondary">Clear</a>
                 <?php endif; ?>
             </div>
@@ -150,11 +277,10 @@ if ($search) {
         
         <!-- Items List -->
         <h3>Items List</h3>
-        <?php if ($items->num_rows > 0): ?>
+        <?php if (count($displayed_items) > 0): ?>
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Item Name</th>
                         <th>Section</th>
                         <th>Item Type</th>
@@ -162,9 +288,8 @@ if ($search) {
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($item = $items->fetch_assoc()): ?>
+                    <?php foreach($displayed_items as $item): ?>
                         <tr>
-                            <td><?php echo $item['item_id']; ?></td>
                             <td><?php echo htmlspecialchars($item['label']); ?></td>
                             <td><?php echo htmlspecialchars($item['section_name']); ?></td>
                             <td><?php echo htmlspecialchars($item['item_type_name']); ?></td>
@@ -173,7 +298,7 @@ if ($search) {
                                 <button class="btn btn-danger btn-sm" onclick="confirmDelete(<?php echo $item['item_id']; ?>, '<?php echo htmlspecialchars($item['label']); ?>')">Delete</button>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         <?php else: ?>
@@ -353,6 +478,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // Custom Combobox for Add Form
 const itemTypeSearch = document.getElementById('itemTypeSearch');
 const itemTypeValue = document.getElementById('itemTypeValue');
+const itemTypeText = document.getElementById('itemTypeText');
 const itemTypeDropdown = document.getElementById('itemTypeDropdown');
 
 if (itemTypeSearch) {
@@ -363,15 +489,30 @@ if (itemTypeSearch) {
     itemTypeSearch.addEventListener('input', function() {
         const filter = this.value.toLowerCase();
         const options = itemTypeDropdown.querySelectorAll('.combobox-option');
+        let hasMatch = false;
         
         options.forEach(option => {
             const text = option.textContent.toLowerCase();
             if (text.includes(filter)) {
                 option.style.display = 'block';
+                hasMatch = true;
             } else {
                 option.style.display = 'none';
             }
         });
+        
+        // If user is typing and no exact match, prepare for new item type
+        if (this.value.trim() !== '') {
+            itemTypeText.value = this.value.trim();
+            // Mark as new if no exact match
+            const exactMatch = Array.from(options).some(opt => 
+                opt.textContent.trim().toLowerCase() === this.value.trim().toLowerCase() && 
+                opt.style.display !== 'none'
+            );
+            if (!exactMatch) {
+                itemTypeValue.value = 'new';
+            }
+        }
         
         itemTypeDropdown.classList.add('show');
     });
@@ -380,6 +521,7 @@ if (itemTypeSearch) {
         option.addEventListener('click', function() {
             itemTypeSearch.value = this.textContent.trim();
             itemTypeValue.value = this.getAttribute('data-value');
+            itemTypeText.value = this.textContent.trim();
             itemTypeDropdown.classList.remove('show');
         });
     });

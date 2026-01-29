@@ -328,142 +328,159 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
         
         <!-- Tab Content -->
         <div style="padding: 1.5rem;">
-            <!-- Stock In Form - Green Theme -->
-            <div id="stock-in" class="tab-content" style="display: block; border: 2px solid #4CAF50; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e8f5e9 0%, white 100%);">
-                <h3 style="color: #4CAF50; margin-bottom: 1rem;">➕ Stock In</h3>
+            <!-- Stock In Form -->
+            <div id="stock-in" class="tab-content" style="display: block; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; background: white;">
+                <h3 style="color: #333; margin-bottom: 1.5rem; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem;"><i class="fas fa-plus-circle"></i> Stock In</h3>
                 <form method="POST" id="stockInForm">
                     <input type="hidden" name="action" value="stock_in">
                     
-                    <div class="form-group">
-                        <label>Item *</label>
-                        <select name="item_id" class="form-control" required>
-                            <option value="">Select Item</option>
-                            <?php 
-                            $items = $conn->query("SELECT * FROM item ORDER BY label");
-                            while($item = $items->fetch_assoc()): 
-                            ?>
-                                <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Item *</label>
+                            <select name="item_id" class="form-control" required>
+                                <option value="">Select Item</option>
+                                <?php 
+                                $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                while($item = $items->fetch_assoc()): 
+                                ?>
+                                    <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Quantity *</label>
+                            <input type="number" name="quantity" class="form-control" required min="1">
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Quantity *</label>
-                        <input type="number" name="quantity" class="form-control" required min="1">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Supplier</label>
+                            <input type="text" name="supplier" class="form-control" placeholder="Supplier name">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Reference No.</label>
+                            <input type="text" name="reference_number" class="form-control" placeholder="Invoice/PO/DR number">
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Supplier</label>
-                        <input type="text" name="supplier" class="form-control" placeholder="Supplier name">
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Expiry Date</label>
+                            <input type="date" name="expiry_date" class="form-control">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Remarks</label>
+                            <input type="text" name="remarks" class="form-control" placeholder="Optional notes">
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Reference No.</label>
-                        <input type="text" name="reference_number" class="form-control" placeholder="Invoice/PO/DR number">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Expiry Date</label>
-                        <input type="date" name="expiry_date" class="form-control">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Remarks</label>
-                        <input type="text" name="remarks" class="form-control" placeholder="Optional notes">
-                    </div>
-                    
-                    <button type="submit" class="btn btn-success" style="width: 100%;">✓ Add Stock</button>
+                    <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 0.5rem;"><i class="fas fa-check"></i> Add Stock</button>
                 </form>
             </div>
             
-            <!-- Stock Out Form - Red Theme -->
-            <div id="stock-out" class="tab-content" style="display: none; border: 2px solid #f44336; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #ffebee 0%, white 100%);">
-                <h3 style="color: #f44336; margin-bottom: 1rem;">➖ Stock Out</h3>
+            <!-- Stock Out Form -->
+            <div id="stock-out" class="tab-content" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; background: white;">
+                <h3 style="color: #333; margin-bottom: 1.5rem; border-bottom: 2px solid #f5576c; padding-bottom: 0.5rem;"><i class="fas fa-minus-circle"></i> Stock Out</h3>
                 <form method="POST" id="stockOutForm" onsubmit="return confirmStockOut()">
                     <input type="hidden" name="action" value="stock_out">
                     
-                    <div class="form-group">
-                        <label>Item *</label>
-                        <select name="item_id" id="stockOutItem" class="form-control" required onchange="checkStock(this.value, 'stockOutQty')">
-                            <option value="">Select Item</option>
-                            <?php 
-                            $items = $conn->query("SELECT * FROM item ORDER BY label");
-                            while($item = $items->fetch_assoc()): 
-                            ?>
-                                <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Item *</label>
+                            <select name="item_id" id="stockOutItem" class="form-control" required onchange="checkStock(this.value, 'stockOutQty')">
+                                <option value="">Select Item</option>
+                                <?php 
+                                $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                while($item = $items->fetch_assoc()): 
+                                ?>
+                                    <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Quantity *</label>
+                            <input type="number" name="quantity" id="stockOutQty" class="form-control" required min="1">
+                            <small id="stockOutAvailable" style="color: #666;"></small>
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Quantity *</label>
-                        <input type="number" name="quantity" id="stockOutQty" class="form-control" required min="1">
-                        <small id="stockOutAvailable" style="color: #666;"></small>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Reference No.</label>
+                            <input type="text" name="reference_number" class="form-control" placeholder="Requisition number">
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Remarks *</label>
+                            <input type="text" name="remarks" class="form-control" required placeholder="Reason for removal">
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Reference No.</label>
-                        <input type="text" name="reference_number" class="form-control" placeholder="Requisition number">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>Remarks *</label>
-                        <input type="text" name="remarks" class="form-control" required placeholder="Reason for removal">
-                    </div>
-                    
-                    <button type="submit" class="btn btn-danger" style="width: 100%;">✓ Remove Stock</button>
+                    <button type="submit" class="btn btn-danger" style="width: 100%; margin-top: 0.5rem;"><i class="fas fa-check"></i> Remove Stock</button>
                 </form>
             </div>
             
-            <!-- Stock Usage Form - Blue Theme -->
-            <div id="stock-usage" class="tab-content" style="display: none; border: 2px solid #2196F3; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e3f2fd 0%, white 100%);">
-                <h3 style="color: #2196F3; margin-bottom: 1rem;"><i class="fas fa-minus-circle"></i> Record Usage</h3>
+            <!-- Stock Usage Form -->
+            <div id="stock-usage" class="tab-content" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; background: white;">
+                <h3 style="color: #333; margin-bottom: 1.5rem; border-bottom: 2px solid #764ba2; padding-bottom: 0.5rem;"><i class="fas fa-clipboard-list"></i> Record Usage</h3>
                 <form method="POST" id="usageForm" onsubmit="return confirmUsage()">
                     <input type="hidden" name="action" value="stock_usage">
                     
-                    <div class="form-group">
-                        <label>Item *</label>
-                        <select name="item_id" id="usageItem" class="form-control" required onchange="checkStock(this.value, 'usageQty')">
-                            <option value="">Select Item</option>
-                            <?php 
-                            $items = $conn->query("SELECT * FROM item ORDER BY label");
-                            while($item = $items->fetch_assoc()): 
-                            ?>
-                                <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Item *</label>
+                            <select name="item_id" id="usageItem" class="form-control" required onchange="checkStock(this.value, 'usageQty')">
+                                <option value="">Select Item</option>
+                                <?php 
+                                $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                while($item = $items->fetch_assoc()): 
+                                ?>
+                                    <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Quantity *</label>
+                            <input type="number" name="quantity" id="usageQty" class="form-control" required min="1" value="1">
+                            <small id="usageAvailable" style="color: #666;"></small>
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Quantity *</label>
-                        <input type="number" name="quantity" id="usageQty" class="form-control" required min="1" value="1">
-                        <small id="usageAvailable" style="color: #666;"></small>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>Employee *</label>
+                            <select name="employee_id" class="form-control" required>
+                                <option value="">Select Employee</option>
+                                <?php 
+                                $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                                while($emp = $employees->fetch_assoc()): 
+                                ?>
+                                    <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>
+                                <?php endwhile; ?>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>Purpose *</label>
+                            <input type="text" name="purpose" class="form-control" required placeholder="Purpose of use">
+                        </div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Employee *</label>
-                        <select name="employee_id" class="form-control" required>
-                            <option value="">Select Employee</option>
-                            <?php 
-                            $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
-                            while($emp = $employees->fetch_assoc()): 
-                            ?>
-                                <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>
-                            <?php endwhile; ?>
-                        </select>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                        <div class="form-group">
+                            <label>OR Number</label>
+                            <input type="text" name="or_number" class="form-control" placeholder="Official receipt number">
+                        </div>
+                        <div></div>
                     </div>
                     
-                    <div class="form-group">
-                        <label>Purpose *</label>
-                        <input type="text" name="purpose" class="form-control" required placeholder="Purpose of use">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>OR Number</label>
-                        <input type="text" name="or_number" class="form-control" placeholder="Official receipt number">
-                    </div>
-                    
-                    <button type="submit" class="btn btn-primary" style="width: 100%;">✓ Record Usage</button>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;"><i class="fas fa-check"></i> Record Usage</button>
                 </form>
             </div>
         </div>

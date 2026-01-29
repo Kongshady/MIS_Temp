@@ -13,6 +13,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] == 'create_order') {
             $patient_id = $_POST['patient_id'];
+            $physician_id = !empty($_POST['physician_id']) ? $_POST['physician_id'] : NULL;
             $test_ids = isset($_POST['test_id']) ? (array)$_POST['test_id'] : [];
             $remarks = !empty($_POST['remarks']) ? $_POST['remarks'] : NULL;
             
@@ -20,8 +21,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
                 $message = '<div class="alert alert-danger">Please select at least one test!</div>';
             } else {
                 // Create ONE order for this patient request
-                $stmt = $conn->prepare("INSERT INTO lab_test_order (patient_id, order_date, status, remarks) VALUES (?, NOW(), 'pending', ?)");
-                $stmt->bind_param("is", $patient_id, $remarks);
+                $stmt = $conn->prepare("INSERT INTO lab_test_order (patient_id, physician_id, order_date, status, remarks) VALUES (?, ?, NOW(), 'pending', ?)");
+                $stmt->bind_param("iis", $patient_id, $physician_id, $remarks);
                 
                 if ($stmt->execute()) {
                     $order_id = $conn->insert_id;
@@ -206,7 +207,6 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                 <table class="table">
                     <thead>
                         <tr>
-                            <th>Order ID</th>
                             <th>Order Date</th>
                             <th>Patient</th>
                             <th>Patient Type</th>
@@ -229,7 +229,6 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                                                          ORDER BY s.label, t.label");
                         ?>
                             <tr>
-                                <td><strong>#<?php echo $order['lab_test_order_id']; ?></strong></td>
                                 <td><?php echo date('M d, Y h:i A', strtotime($order['order_date'])); ?></td>
                                 <td>
                                     <a href="patient_details.php?id=<?php echo $order['patient_id']; ?>">
@@ -329,6 +328,24 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     ?>
                         <option value="<?php echo $patient['patient_id']; ?>">
                             <?php echo htmlspecialchars($patient['firstname'] . ' ' . $patient['lastname']) . ' (' . $patient['patient_type'] . ')'; ?>
+                        </option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Physician (Optional)</label>
+                <select name="physician_id" class="form-control">
+                    <option value="">-- No Physician --</option>
+                    <?php 
+                    $physicians = $conn->query("SELECT physician_id, physician_name, specialization FROM physician WHERE status_code = 1 ORDER BY physician_name");
+                    while($physician = $physicians->fetch_assoc()): 
+                    ?>
+                        <option value="<?php echo $physician['physician_id']; ?>">
+                            <?php echo htmlspecialchars($physician['physician_name']); ?>
+                            <?php if ($physician['specialization']): ?>
+                                - <?php echo htmlspecialchars($physician['specialization']); ?>
+                            <?php endif; ?>
                         </option>
                     <?php endwhile; ?>
                 </select>

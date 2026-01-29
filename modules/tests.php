@@ -81,8 +81,26 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// Get pagination parameter
+$rows_per_page = isset($_GET['rows']) && $_GET['rows'] !== 'all' ? (int)$_GET['rows'] : 0;
+
 // Get all tests
 $tests = $conn->query("SELECT t.*, s.label as section_name FROM test t LEFT JOIN section s ON t.section_id = s.section_id ORDER BY t.test_id DESC");
+
+// Apply pagination if needed
+if ($rows_per_page > 0) {
+    $all_tests = [];
+    while ($row = $tests->fetch_assoc()) {
+        $all_tests[] = $row;
+    }
+    $displayed_tests = array_slice($all_tests, 0, $rows_per_page);
+} else {
+    $all_tests = [];
+    while ($row = $tests->fetch_assoc()) {
+        $all_tests[] = $row;
+    }
+    $displayed_tests = $all_tests;
+}
 
 // Check if current_price column exists
 $columns = $conn->query("SHOW COLUMNS FROM test LIKE 'current_price'");
@@ -152,13 +170,26 @@ $history_table_exists = $tables && $tables->num_rows > 0;
             </div>
         </form>
         
+        <!-- Pagination Control -->
+        <form method="GET" style="margin-bottom: 1rem;">
+            <div style="display: flex; gap: 0.75rem; align-items: center; justify-content: flex-end;">
+                <label style="margin-bottom: 0; font-weight: 500;">Rows per page:</label>
+                <select name="rows" class="form-control" style="width: 120px;" onchange="this.form.submit()">
+                    <option value="10" <?php echo $rows_per_page == 10 ? 'selected' : ''; ?>>10</option>
+                    <option value="25" <?php echo $rows_per_page == 25 ? 'selected' : ''; ?>>25</option>
+                    <option value="50" <?php echo $rows_per_page == 50 ? 'selected' : ''; ?>>50</option>
+                    <option value="100" <?php echo $rows_per_page == 100 ? 'selected' : ''; ?>>100</option>
+                    <option value="all" <?php echo $rows_per_page == 0 ? 'selected' : ''; ?>>All</option>
+                </select>
+            </div>
+        </form>
+        
         <!-- Tests List -->
         <h3>Tests List</h3>
-        <?php if ($tests->num_rows > 0): ?>
+        <?php if (count($displayed_tests) > 0): ?>
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Test Name</th>
                         <th>Section</th>
                         <?php if ($price_column_exists): ?>
@@ -169,19 +200,25 @@ $history_table_exists = $tables && $tables->num_rows > 0;
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($test = $tests->fetch_assoc()): 
+                    <?php foreach($displayed_tests as $test): 
                         $previous_price = 0.00;
                         if ($price_column_exists && $history_table_exists) {
-                            // Get previous price from history
-                            $history_query = $conn->query("SELECT previous_price FROM test_price_history WHERE test_id = {$test['test_id']} ORDER BY updated_at DESC LIMIT 1");
+                            // Get the second most recent price (which is the previous price before current)
+                            $history_query = $conn->query("SELECT new_price FROM test_price_history WHERE test_id = {$test['test_id']} ORDER BY updated_at DESC LIMIT 1 OFFSET 1");
                             if ($history_query && $history_query->num_rows > 0) {
                                 $history = $history_query->fetch_assoc();
-                                $previous_price = $history['previous_price'];
+                                $previous_price = $history['new_price'];
+                            } else {
+                                // If no second entry, try to get the first entry's previous_price
+                                $first_history = $conn->query("SELECT previous_price FROM test_price_history WHERE test_id = {$test['test_id']} ORDER BY updated_at ASC LIMIT 1");
+                                if ($first_history && $first_history->num_rows > 0) {
+                                    $first = $first_history->fetch_assoc();
+                                    $previous_price = $first['previous_price'];
+                                }
                             }
                         }
                     ?>
                         <tr>
-                            <td><?php echo $test['test_id']; ?></td>
                             <td><?php echo htmlspecialchars($test['label']); ?></td>
                             <td><?php echo htmlspecialchars($test['section_name']); ?></td>
                             <?php if ($price_column_exists): ?>
@@ -201,7 +238,7 @@ $history_table_exists = $tables && $tables->num_rows > 0;
                                 </form>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         <?php else: ?>

@@ -64,7 +64,7 @@ function require_login($redirect_to = null) {
         }
         
         // Redirect to login
-        header('Location: /Proto/MIS_Temp/login.php');
+        header('Location: /mis_project/login.php');
         exit();
     }
 }
@@ -351,7 +351,7 @@ function show_access_denied($permission_key) {
             
             <div class="buttons">
                 <a href="javascript:history.back()" class="btn btn-secondary">Go Back</a>
-                <a href="/Proto/MIS_Temp/modules/dashboard.php" class="btn btn-primary">Go to Dashboard</a>
+                <a href="mis_project/modules/dashboard.php" class="btn btn-primary">Go to Dashboard</a>
             </div>
         </div>
     </body>
@@ -446,7 +446,7 @@ function logout_user() {
     session_destroy();
     
     // Redirect to login
-    header('Location: /Proto/MIS_Temp/login.php');
+    header('Location: /mis_project/login.php');
     exit();
 }
 
@@ -458,91 +458,91 @@ function get_accessible_menu() {
     $all_menu_items = [
         [
             'label' => 'Dashboard',
-            'url' => '/Proto/MIS_Temp/modules/dashboard.php',
+            'url' => 'dashboard.php',
             'icon' => '<i class="fa-solid fa-gauge"></i>',
             'permission' => null // Everyone can access
         ],
         [
             'label' => 'Patients',
-            'url' => '/Proto/MIS_Temp/modules/patients.php',
+            'url' => 'patients.php',
             'icon' => '<i class="fa-solid fa-users"></i>',
             'permission' => 'patients.view'
         ],
         [
             'label' => 'Physicians',
-            'url' => '/Proto/MIS_Temp/modules/physicians.php',
+            'url' => 'physicians.php',
             'icon' => '<i class="fa-solid fa-user-doctor"></i>',
             'permission' => 'physicians.view'
         ],
         [
             'label' => 'Lab Results',
-            'url' => '/Proto/MIS_Temp/modules/lab_results.php',
+            'url' => 'lab_results.php',
             'icon' => '<i class="fa-solid fa-microscope"></i>',
             'permission' => 'lab_results.view'
         ],
         [
             'label' => 'Tests',
-            'url' => '/Proto/MIS_Temp/modules/tests.php',
+            'url' => 'tests.php',
             'icon' => '<i class="fa-solid fa-flask"></i>',
             'permission' => 'tests.manage'
         ],
         [
             'label' => 'Sections',
-            'url' => '/Proto/MIS_Temp/modules/sections.php',
+            'url' => 'sections.php',
             'icon' => '<i class="fa-solid fa-building"></i>',
             'permission' => 'sections.manage'
         ],
         [
             'label' => 'Employees',
-            'url' => '/Proto/MIS_Temp/modules/employees.php',
+            'url' => 'employees.php',
             'icon' => '<i class="fa-solid fa-user-tie"></i>',
             'permission' => 'employees.view'
         ],
         [
             'label' => 'Transactions',
-            'url' => '/Proto/MIS_Temp/modules/transactions.php',
+            'url' => 'transactions.php',
             'icon' => '<i class="fa-solid fa-file-invoice"></i>',
             'permission' => 'transactions.view'
         ],
         [
             'label' => 'Items',
-            'url' => '/Proto/MIS_Temp/modules/items.php',
+            'url' => 'items.php',
             'icon' => '<i class="fa-solid fa-box"></i>',
             'permission' => 'items.view'
         ],
         [
             'label' => 'Inventory',
-            'url' => '/Proto/MIS_Temp/modules/inventory.php',
+            'url' => 'inventory.php',
             'icon' => '<i class="fa-solid fa-warehouse"></i>',
             'permission' => 'inventory.view'
         ],
         [
             'label' => 'Equipment',
-            'url' => '/Proto/MIS_Temp/modules/equipment.php',
+            'url' => 'equipment.php',
             'icon' => '<i class="fa-solid fa-wrench"></i>',
             'permission' => 'equipment.view'
         ],
         [
             'label' => 'Calibration',
-            'url' => '/Proto/MIS_Temp/modules/calibration.php',
+            'url' => 'calibration.php',
             'icon' => '<i class="fa-solid fa-scale-balanced"></i>',
             'permission' => 'calibration.view'
         ],
         [
             'label' => 'Certificates',
-            'url' => '/Proto/MIS_Temp/modules/certificates.php',
+            'url' => 'certificates.php',
             'icon' => '<i class="fa-solid fa-certificate"></i>',
             'permission' => 'certificates.view'
         ],
         [
             'label' => 'Reports',
-            'url' => '/Proto/MIS_Temp/reports/compliance_reports.php',
+            'url' => '../modules/compliance_reports.php',
             'icon' => '<i class="fa-solid fa-chart-line"></i>',
             'permission' => 'reports.view'
         ],
         [
             'label' => 'Activity Logs',
-            'url' => '/Proto/MIS_Temp/modules/logs.php',
+            'url' => 'logs.php',
             'icon' => '<i class="fa-solid fa-clipboard-list"></i>',
             'permission' => 'logs.view'
         ],

@@ -12,7 +12,7 @@ require_once 'includes/auth.php';
 
 // If already logged in, redirect to dashboard
 if (is_logged_in()) {
-    header('Location: /Proto/MIS_Temp/modules/dashboard.php');
+    header('Location: /mis_project/modules/dashboard.php');
     exit();
 }
 
@@ -61,7 +61,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST' && isset($_POST['login'])) {
                         log_activity($conn, $user['employee_id'], 'User logged in successfully', 1);
                         
                         // Redirect to intended page or dashboard
-                        $redirect = $_SESSION['redirect_after_login'] ?? '/Proto/MIS_Temp/modules/dashboard.php';
+                        $redirect = $_SESSION['redirect_after_login'] ?? '/mis_project/modules/dashboard.php';
                         unset($_SESSION['redirect_after_login']);
                         header('Location: ' . $redirect);
                         exit();

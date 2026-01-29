@@ -311,7 +311,6 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Name</th>
                         <th>Model</th>
                         <th>Serial No.</th>
@@ -327,7 +326,6 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     while($equip = $equipment_list->fetch_assoc()): 
                     ?>
                         <tr>
-                            <td><?php echo $equip['equipment_id']; ?></td>
                             <td><?php echo htmlspecialchars($equip['name']); ?></td>
                             <td><?php echo htmlspecialchars($equip['model']); ?></td>
                             <td><?php echo htmlspecialchars($equip['serial_no']); ?></td>

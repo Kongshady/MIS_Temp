@@ -40,10 +40,53 @@ require_once __DIR__ . '/auth.php';
             <?php endforeach; ?>
         </nav>
         <div class="sidebar-footer">
-            <a href="/Proto/MIS_Temp/logout.php" class="nav-item logout-link">
-                <span class="nav-icon"><i class="fa-solid fa-right-from-bracket"></i></span>
-                <span class="nav-text">Logout</span>
-            </a>
+            <div class="user-profile-dropdown">
+                <button class="user-profile-btn" onclick="toggleUserMenu()">
+                    <div class="user-avatar">
+                        <i class="fas fa-user-circle"></i>
+                    </div>
+                    <div class="user-info">
+                        <span class="user-name"><?php echo htmlspecialchars($_SESSION['username'] ?? 'User'); ?></span>
+                        <span class="user-role"><?php echo htmlspecialchars($_SESSION['role_name'] ?? 'Employee'); ?></span>
+                    </div>
+                    <i class="fas fa-chevron-down"></i>
+                </button>
+                
+                <div class="user-dropdown-menu" id="userDropdownMenu">
+                    <a href="account_settings.php" class="dropdown-item">
+                        <i class="fas fa-cog"></i>
+                        <span>Account Settings</span>
+                        <span class="shortcut">⌘S</span>
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <a href="../logout.php" class="dropdown-item logout">
+                        <i class="fas fa-right-from-bracket"></i>
+                        <span>Log out</span>
+                        <span class="shortcut">⇧⌘Q</span>
+                    </a>
+                </div>
+            </div>
         </div>
     </aside>
     <div class="main-content">
+        
+    <script>
+    // Toggle user dropdown menu
+    function toggleUserMenu() {
+        const dropdown = document.getElementById('userDropdownMenu');
+        const parent = dropdown.parentElement;
+        dropdown.classList.toggle('show');
+        parent.classList.toggle('active');
+    }
+    
+    // Close dropdown when clicking outside
+    document.addEventListener('click', function(event) {
+        const userDropdown = document.querySelector('.user-profile-dropdown');
+        const dropdownMenu = document.getElementById('userDropdownMenu');
+        
+        if (userDropdown && !userDropdown.contains(event.target)) {
+            dropdownMenu.classList.remove('show');
+            userDropdown.classList.remove('active');
+        }
+    });
+    </script>

@@ -21,8 +21,6 @@ $logs = $conn->query("SELECT a.*, e.firstname, e.lastname, e.position
             <table class="table">
                 <thead>
                     <tr>
-                        <th>#</th>
-                        <th>Log ID</th>
                         <th>Employee</th>
                         <th>Position</th>
                         <th>Description</th>
@@ -30,13 +28,8 @@ $logs = $conn->query("SELECT a.*, e.firstname, e.lastname, e.position
                     </tr>
                 </thead>
                 <tbody>
-                    <?php 
-                    $row_number = 1;
-                    while($log = $logs->fetch_assoc()): 
-                    ?>
+                    <?php while($log = $logs->fetch_assoc()): ?>
                         <tr>
-                            <td><?php echo $row_number++; ?></td>
-                            <td><?php echo $log['activity_log_id']; ?></td>
                             <td><?php echo htmlspecialchars($log['firstname'] . ' ' . $log['lastname']); ?></td>
                             <td><?php echo htmlspecialchars($log['position']); ?></td>
                             <td><?php echo htmlspecialchars($log['description']); ?></td>

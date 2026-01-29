@@ -276,7 +276,6 @@ $employees = $conn->query($query);
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Name</th>
                         <th>Username</th>
                         <th>Section</th>
@@ -289,7 +288,6 @@ $employees = $conn->query($query);
                 <tbody>
                     <?php while($employee = $employees->fetch_assoc()): ?>
                         <tr>
-                            <td><?php echo $employee['employee_id']; ?></td>
                             <td><?php echo htmlspecialchars($employee['firstname'] . ' ' . $employee['middlename'] . ' ' . $employee['lastname']); ?></td>
                             <td><?php echo htmlspecialchars($employee['username']); ?></td>
                             <td><?php echo htmlspecialchars($employee['section_name']); ?></td>

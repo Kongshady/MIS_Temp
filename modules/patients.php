@@ -66,21 +66,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Search functionality
-$search_query = '';
-$search_param = '';
-if (isset($_GET['search']) && !empty($_GET['search'])) {
-    $search_param = $_GET['search'];
-    $search_query = " AND (p.firstname LIKE '%" . $conn->real_escape_string($search_param) . "%' 
-                      OR p.lastname LIKE '%" . $conn->real_escape_string($search_param) . "%' 
-                      OR p.patient_id LIKE '%" . $conn->real_escape_string($search_param) . "%')";
+// Get filter parameters
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$patient_type = isset($_GET['patient_type']) ? $_GET['patient_type'] : '';
+$gender = isset($_GET['gender']) ? $_GET['gender'] : '';
+
+// Build query with filters
+$query = "SELECT p.* FROM patient p WHERE p.status_code = 1";
+$conditions = [];
+$params = [];
+$types = '';
+
+if (!empty($search)) {
+    $conditions[] = "(p.firstname LIKE ? OR p.lastname LIKE ? OR p.patient_id LIKE ?)";
+    $search_param = "%$search%";
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $types .= 'sss';
 }
 
-// Get all active patients
-$patients = $conn->query("SELECT p.*
-                         FROM patient p 
-                         WHERE p.status_code = 1 $search_query
-                         ORDER BY p.datetime_added DESC");
+if (!empty($patient_type)) {
+    $conditions[] = "p.patient_type = ?";
+    $params[] = $patient_type;
+    $types .= 's';
+}
+
+if (!empty($gender)) {
+    $conditions[] = "p.gender = ?";
+    $params[] = $gender;
+    $types .= 's';
+}
+
+if (!empty($conditions)) {
+    $query .= " AND " . implode(" AND ", $conditions);
+}
+
+$query .= " ORDER BY p.datetime_added DESC";
+
+if (!empty($params)) {
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $patients = $stmt->get_result();
+} else {
+    $patients = $conn->query($query);
+}
 ?>
 
 <div class="container">
@@ -150,13 +181,38 @@ $patients = $conn->query("SELECT p.*
             <button type="submit" class="btn btn-primary">Add Patient</button>
         </form>
         
-        <!-- Search Bar -->
-        <form method="GET" style="margin-bottom: 1.5rem; display: flex; gap: 0.75rem;">
-            <input type="text" name="search" class="form-control" placeholder="Search by name or patient ID..." value="<?php echo htmlspecialchars($search_param); ?>" style="flex: 1;">
-            <button type="submit" class="btn btn-primary">Search</button>
-            <?php if ($search_param): ?>
-                <a href="patients.php" class="btn btn-secondary">Clear</a>
-            <?php endif; ?>
+        <!-- Filter Section -->
+        <form method="GET" style="margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto auto; gap: 0.75rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Search by name or patient ID..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Patient Type</label>
+                    <select name="patient_type" class="form-control">
+                        <option value="">All Types</option>
+                        <option value="Internal" <?php echo $patient_type == 'Internal' ? 'selected' : ''; ?>>Internal</option>
+                        <option value="External" <?php echo $patient_type == 'External' ? 'selected' : ''; ?>>External</option>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Gender</label>
+                    <select name="gender" class="form-control">
+                        <option value="">All Genders</option>
+                        <option value="Male" <?php echo $gender == 'Male' ? 'selected' : ''; ?>>Male</option>
+                        <option value="Female" <?php echo $gender == 'Female' ? 'selected' : ''; ?>>Female</option>
+                        <option value="Other" <?php echo $gender == 'Other' ? 'selected' : ''; ?>>Other</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+                <?php if ($search || $patient_type || $gender): ?>
+                    <a href="patients.php" class="btn btn-secondary">Clear</a>
+                <?php endif; ?>
+            </div>
         </form>
         
         <!-- Patients List -->
@@ -165,7 +221,6 @@ $patients = $conn->query("SELECT p.*
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Type</th>
                         <th>Full Name</th>
                         <th>Birthdate</th>
@@ -177,7 +232,6 @@ $patients = $conn->query("SELECT p.*
                 <tbody>
                     <?php while($patient = $patients->fetch_assoc()): ?>
                         <tr>
-                            <td><?php echo $patient['patient_id']; ?></td>
                             <td>
                                 <span class="badge <?php echo $patient['patient_type'] == 'Internal' ? 'badge-info' : 'badge-success'; ?>">
                                     <?php echo htmlspecialchars($patient['patient_type']); ?>

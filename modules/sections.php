@@ -79,7 +79,6 @@ $sections = $conn->query("SELECT * FROM section ORDER BY section_id DESC");
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Section Name</th>
                         <th>Actions</th>
                     </tr>
@@ -87,7 +86,6 @@ $sections = $conn->query("SELECT * FROM section ORDER BY section_id DESC");
                 <tbody>
                     <?php while($section = $sections->fetch_assoc()): ?>
                         <tr>
-                            <td><?php echo $section['section_id']; ?></td>
                             <td><?php echo htmlspecialchars($section['label']); ?></td>
                             <td class="table-actions">
                                 <button class="btn btn-warning btn-sm" onclick="editSection(<?php echo htmlspecialchars(json_encode($section)); ?>)">Edit</button>

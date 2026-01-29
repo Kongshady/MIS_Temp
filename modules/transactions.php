@@ -135,7 +135,6 @@ $patient_count = $conn->query("SELECT COUNT(*) as count FROM patient")->fetch_as
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Transaction ID</th>
                         <th>Patient Name</th>
                         <th>OR Number</th>
                         <th>Date & Time</th>
@@ -145,7 +144,6 @@ $patient_count = $conn->query("SELECT COUNT(*) as count FROM patient")->fetch_as
                 <tbody>
                     <?php while($transaction = $transactions->fetch_assoc()): ?>
                         <tr>
-                            <td><?php echo $transaction['transaction_id']; ?></td>
                             <td><?php echo htmlspecialchars($transaction['patient_name']); ?></td>
                             <td><?php echo htmlspecialchars($transaction['or_number']); ?></td>
                             <td><?php echo date('M d, Y h:i A', strtotime($transaction['datetime_added'])); ?></td>

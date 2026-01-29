@@ -59,8 +59,62 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get all physicians
-$physicians = $conn->query("SELECT p.*, s.label as status_label FROM physician p LEFT JOIN status_code s ON p.status_code = s.status_code ORDER BY p.physician_name ASC");
+// Get filter and pagination parameters
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$specialization_filter = isset($_GET['specialization']) ? $_GET['specialization'] : '';
+$rows_per_page = isset($_GET['rows']) && $_GET['rows'] !== 'all' ? (int)$_GET['rows'] : 0;
+
+// Build query with filters
+$query = "SELECT p.*, s.label as status_label FROM physician p LEFT JOIN status_code s ON p.status_code = s.status_code WHERE 1=1";
+$conditions = [];
+$params = [];
+$types = '';
+
+if (!empty($search)) {
+    $conditions[] = "(p.physician_name LIKE ? OR p.contact_number LIKE ? OR p.email LIKE ?)";
+    $search_param = "%$search%";
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $params[] = $search_param;
+    $types .= 'sss';
+}
+
+if (!empty($specialization_filter)) {
+    $conditions[] = "p.specialization LIKE ?";
+    $spec_param = "%$specialization_filter%";
+    $params[] = $spec_param;
+    $types .= 's';
+}
+
+if (!empty($conditions)) {
+    $query .= " AND " . implode(" AND ", $conditions);
+}
+
+$query .= " ORDER BY p.physician_name ASC";
+
+if (!empty($params)) {
+    $stmt = $conn->prepare($query);
+    $stmt->bind_param($types, ...$params);
+    $stmt->execute();
+    $physicians = $stmt->get_result();
+} else {
+    $physicians = $conn->query($query);
+}
+
+// Apply pagination if needed
+if ($rows_per_page > 0) {
+    $all_physicians = [];
+    while ($row = $physicians->fetch_assoc()) {
+        $all_physicians[] = $row;
+    }
+    $displayed_physicians = array_slice($all_physicians, 0, $rows_per_page);
+} else {
+    $all_physicians = [];
+    while ($row = $physicians->fetch_assoc()) {
+        $all_physicians[] = $row;
+    }
+    $displayed_physicians = $all_physicians;
+}
 ?>
 
 <div class="container">
@@ -103,13 +157,43 @@ $physicians = $conn->query("SELECT p.*, s.label as status_label FROM physician p
             <button type="submit" class="btn btn-primary">Add Physician</button>
         </form>
         
+        <!-- Filter Section -->
+        <form method="GET" style="margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 150px auto auto; gap: 0.75rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Search</label>
+                    <input type="text" name="search" class="form-control" placeholder="Search by name, contact, or email..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Specialization</label>
+                    <input type="text" name="specialization" class="form-control" placeholder="e.g., Pathologist" value="<?php echo htmlspecialchars($specialization_filter); ?>">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label style="font-size: 0.875rem; margin-bottom: 0.25rem;">Rows</label>
+                    <select name="rows" class="form-control">
+                        <option value="10" <?php echo $rows_per_page == 10 ? 'selected' : ''; ?>>10</option>
+                        <option value="25" <?php echo $rows_per_page == 25 ? 'selected' : ''; ?>>25</option>
+                        <option value="50" <?php echo $rows_per_page == 50 ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo $rows_per_page == 100 ? 'selected' : ''; ?>>100</option>
+                        <option value="all" <?php echo $rows_per_page == 0 ? 'selected' : ''; ?>>All</option>
+                    </select>
+                </div>
+                
+                <button type="submit" class="btn btn-primary"><i class="fas fa-filter"></i> Filter</button>
+                <?php if ($search || $specialization_filter || (isset($_GET['rows']) && $_GET['rows'] != 10)): ?>
+                    <a href="physicians.php" class="btn btn-secondary">Clear</a>
+                <?php endif; ?>
+            </div>
+        </form>
+        
         <!-- Physicians List -->
         <h3>Physicians List</h3>
-        <?php if ($physicians->num_rows > 0): ?>
+        <?php if (count($displayed_physicians) > 0): ?>
             <table class="table">
                 <thead>
                     <tr>
-                        <th>ID</th>
                         <th>Name</th>
                         <th>Specialization</th>
                         <th>Contact</th>
@@ -118,9 +202,8 @@ $physicians = $conn->query("SELECT p.*, s.label as status_label FROM physician p
                     </tr>
                 </thead>
                 <tbody>
-                    <?php while($physician = $physicians->fetch_assoc()): ?>
+                    <?php foreach($displayed_physicians as $physician): ?>
                         <tr>
-                            <td><?php echo $physician['physician_id']; ?></td>
                             <td><?php echo htmlspecialchars($physician['physician_name']); ?></td>
                             <td><?php echo htmlspecialchars($physician['specialization']); ?></td>
                             <td><?php echo htmlspecialchars($physician['contact_number']); ?></td>
@@ -134,7 +217,7 @@ $physicians = $conn->query("SELECT p.*, s.label as status_label FROM physician p
                                 </form>
                             </td>
                         </tr>
-                    <?php endwhile; ?>
+                    <?php endforeach; ?>
                 </tbody>
             </table>
         <?php else: ?>

@@ -19,6 +19,6 @@ session_unset();
 session_destroy();
 
 // Redirect to login
-header('Location: /Proto/MIS_Temp/login.php');
+header('Location: /mis_project/login.php');
 exit();
 ?>
