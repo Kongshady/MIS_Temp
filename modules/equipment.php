@@ -123,18 +123,52 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get all equipment
-$equipment_list = $conn->query("SELECT e.*, s.label as section_name FROM equipment e LEFT JOIN section s ON e.section_id = s.section_id ORDER BY e.equipment_id DESC");
+// Pagination for Equipment Usage
+$rows_usage = isset($_GET['rows_usage']) ? intval($_GET['rows_usage']) : 10;
+$page_usage = isset($_GET['page_usage']) ? intval($_GET['page_usage']) : 1;
 
-// Get recent equipment usage
-$recent_usage = $conn->query("SELECT eu.*, e.name as equipment_name FROM equipment_usage eu 
+// Pagination for Equipment Management
+$rows_management = isset($_GET['rows_management']) ? intval($_GET['rows_management']) : 10;
+$page_management = isset($_GET['page_management']) ? intval($_GET['page_management']) : 1;
+
+// Get all equipment usage records
+$usage_query = "SELECT eu.*, e.name as equipment_name FROM equipment_usage eu 
     LEFT JOIN equipment e ON eu.equipment_id = e.equipment_id 
-    ORDER BY eu.date_used DESC, eu.datetime_added DESC LIMIT 20");
+    ORDER BY eu.date_used DESC, eu.datetime_added DESC";
+$all_usage = $conn->query($usage_query);
+$usage_items = [];
+if ($all_usage) {
+    while($row = $all_usage->fetch_assoc()) {
+        $usage_items[] = $row;
+    }
+}
+$total_usage = count($usage_items);
+$total_usage_pages = ceil($total_usage / $rows_usage);
+$page_usage = max(1, min($page_usage, max(1, $total_usage_pages)));
+$offset_usage = ($page_usage - 1) * $rows_usage;
+$recent_usage = array_slice($usage_items, $offset_usage, $rows_usage);
+
+// Get all equipment
+$equipment_query = "SELECT e.*, s.label as section_name FROM equipment e LEFT JOIN section s ON e.section_id = s.section_id ORDER BY e.equipment_id DESC";
+$all_equipment = $conn->query($equipment_query);
+$equipment_items = [];
+if ($all_equipment) {
+    while($row = $all_equipment->fetch_assoc()) {
+        $equipment_items[] = $row;
+    }
+}
+$total_equipment = count($equipment_items);
+$total_equipment_pages = ceil($total_equipment / $rows_management);
+$page_management = max(1, min($page_management, max(1, $total_equipment_pages)));
+$offset_management = ($page_management - 1) * $rows_management;
+$equipment_list = array_slice($equipment_items, $offset_management, $rows_management);
 
 // Get upcoming maintenance
 // Get filter parameters
 $filter_section = isset($_GET['section']) ? $_GET['section'] : '';
 $filter_status = isset($_GET['status']) ? $_GET['status'] : '';
+$rows_per_page = isset($_GET['rows']) ? intval($_GET['rows']) : 10;
+$current_page = isset($_GET['page']) ? intval($_GET['page']) : 1;
 
 // Build query with filters
 $query = "SELECT DISTINCT e.equipment_id, e.name AS equipment_name, e.model, e.serial_no, 
@@ -154,19 +188,26 @@ if ($filter_section) {
     $query .= " AND e.section_id = " . intval($filter_section);
 }
 
-$query .= " ORDER BY ms.next_due_date ASC LIMIT 20";
+$query .= " ORDER BY ms.next_due_date ASC";
 
 $upcoming = $conn->query($query);
 
 // Apply status filter after query (since it's a calculated field)
-$maintenance_items = [];
+$all_maintenance_items = [];
 if ($upcoming) {
     while($row = $upcoming->fetch_assoc()) {
         if (!$filter_status || $row['status'] == $filter_status) {
-            $maintenance_items[] = $row;
+            $all_maintenance_items[] = $row;
         }
     }
 }
+
+// Pagination calculations
+$total_items = count($all_maintenance_items);
+$total_pages = ceil($total_items / $rows_per_page);
+$current_page = max(1, min($current_page, $total_pages));
+$offset = ($current_page - 1) * $rows_per_page;
+$maintenance_items = array_slice($all_maintenance_items, $offset, $rows_per_page);
 
 // Get sections for filter dropdown
 $sections = $conn->query("SELECT * FROM section ORDER BY label");
@@ -177,8 +218,16 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
     
     <!-- Alerts Section -->
     <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-exclamation-triangle"></i> Maintenance Alerts</h2>
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 style="margin: 0;"><i class="fas fa-exclamation-triangle"></i> Maintenance Alerts</h2>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-secondary" onclick="showAddUsageModal()">
+                    <i class="fas fa-clipboard-list"></i> Record Equipment Usage
+                </button>
+                <button class="btn btn-secondary" onclick="showAddEquipmentModal()">
+                    <i class="fas fa-plus"></i> Add Equipment
+                </button>
+            </div>
         </div>
         
         <!-- Status Legend -->
@@ -212,6 +261,19 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     <option value="Scheduled" <?php echo ($filter_status == 'Scheduled') ? 'selected' : ''; ?>>Scheduled</option>
                 </select>
             </div>
+            
+            <div class="form-group" style="margin-bottom: 0;">
+                <label>Rows per page</label>
+                <select name="rows" class="form-control" onchange="this.form.submit()">
+                    <option value="5" <?php echo ($rows_per_page == 5) ? 'selected' : ''; ?>>5</option>
+                    <option value="10" <?php echo ($rows_per_page == 10) ? 'selected' : ''; ?>>10</option>
+                    <option value="20" <?php echo ($rows_per_page == 20) ? 'selected' : ''; ?>>20</option>
+                    <option value="50" <?php echo ($rows_per_page == 50) ? 'selected' : ''; ?>>50</option>
+                    <option value="100" <?php echo ($rows_per_page == 100) ? 'selected' : ''; ?>>100</option>
+                </select>
+            </div>
+            
+            <input type="hidden" name="page" value="<?php echo $current_page; ?>">
             
             <?php if ($filter_section || $filter_status): ?>
                 <a href="equipment.php" class="btn btn-secondary">Clear Filters</a>
@@ -248,106 +310,276 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            
+            <!-- Pagination -->
+            <?php if ($total_pages > 1): ?>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
+                    <div style="color: #666;">
+                        Showing <?php echo $offset + 1; ?> to <?php echo min($offset + $rows_per_page, $total_items); ?> of <?php echo $total_items; ?> entries
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <?php if ($current_page > 1): ?>
+                            <a href="?section=<?php echo $filter_section; ?>&status=<?php echo $filter_status; ?>&rows=<?php echo $rows_per_page; ?>&page=<?php echo $current_page - 1; ?>" class="btn btn-sm btn-secondary">
+                                <i class="fas fa-chevron-left"></i> Previous
+                            </a>
+                        <?php endif; ?>
+                        
+                        <?php
+                        $start_page = max(1, $current_page - 2);
+                        $end_page = min($total_pages, $current_page + 2);
+                        
+                        if ($start_page > 1): ?>
+                            <a href="?section=<?php echo $filter_section; ?>&status=<?php echo $filter_status; ?>&rows=<?php echo $rows_per_page; ?>&page=1" class="btn btn-sm btn-secondary">1</a>
+                            <?php if ($start_page > 2): ?>
+                                <span style="padding: 0.25rem 0.5rem;">...</span>
+                            <?php endif; ?>
+                        <?php endif; ?>
+                        
+                        <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                            <a href="?section=<?php echo $filter_section; ?>&status=<?php echo $filter_status; ?>&rows=<?php echo $rows_per_page; ?>&page=<?php echo $i; ?>" 
+                               class="btn btn-sm <?php echo ($i == $current_page) ? 'btn-primary' : 'btn-secondary'; ?>">
+                                <?php echo $i; ?>
+                            </a>
+                        <?php endfor; ?>
+                        
+                        <?php if ($end_page < $total_pages): ?>
+                            <?php if ($end_page < $total_pages - 1): ?>
+                                <span style="padding: 0.25rem 0.5rem;">...</span>
+                            <?php endif; ?>
+                            <a href="?section=<?php echo $filter_section; ?>&status=<?php echo $filter_status; ?>&rows=<?php echo $rows_per_page; ?>&page=<?php echo $total_pages; ?>" class="btn btn-sm btn-secondary"><?php echo $total_pages; ?></a>
+                        <?php endif; ?>
+                        
+                        <?php if ($current_page < $total_pages): ?>
+                            <a href="?section=<?php echo $filter_section; ?>&status=<?php echo $filter_status; ?>&rows=<?php echo $rows_per_page; ?>&page=<?php echo $current_page + 1; ?>" class="btn btn-sm btn-secondary">
+                                Next <i class="fas fa-chevron-right"></i>
+                            </a>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         <?php else: ?>
             <p>No upcoming maintenance scheduled.</p>
         <?php endif; ?>
     </div>
     
-    <!-- Equipment Usage/Borrowing -->
+    <!-- Equipment Tabs -->
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-clipboard-list"></i> Equipment Usage Records</h2>
+            <div style="display: flex; justify-content: space-between; align-items: end; border-bottom: 2px solid #dee2e6;">
+                <div style="display: flex; gap: 0;">
+                    <button class="tab-button active" onclick="switchTab('usage')" id="usageTab" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid #007bff; color: #007bff; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        <i class="fas fa-clipboard-list"></i> Equipment Usage Records
+                    </button>
+                    <button class="tab-button" onclick="switchTab('management')" id="managementTab" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid transparent; color: #666; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        <i class="fas fa-tools"></i> Equipment Management
+                    </button>
+                </div>
+                <div style="display: flex; gap: 0.5rem; padding-bottom: 0.5rem;">
+                    <form method="GET" style="display: flex; gap: 0.5rem; align-items: center;" id="usageRowsForm">
+                        <label style="margin: 0; font-size: 0.875rem; color: #666;">Rows:</label>
+                        <select name="rows_usage" class="form-control" style="width: 80px; padding: 0.25rem 0.5rem; height: auto;" onchange="this.form.submit()">
+                            <option value="5" <?php echo ($rows_usage == 5) ? 'selected' : ''; ?>>5</option>
+                            <option value="10" <?php echo ($rows_usage == 10) ? 'selected' : ''; ?>>10</option>
+                            <option value="20" <?php echo ($rows_usage == 20) ? 'selected' : ''; ?>>20</option>
+                            <option value="50" <?php echo ($rows_usage == 50) ? 'selected' : ''; ?>>50</option>
+                            <option value="100" <?php echo ($rows_usage == 100) ? 'selected' : ''; ?>>100</option>
+                        </select>
+                        <input type="hidden" name="page_usage" value="<?php echo $page_usage; ?>">
+                    </form>
+                    <form method="GET" style="display: none; gap: 0.5rem; align-items: center;" id="managementRowsForm">
+                        <label style="margin: 0; font-size: 0.875rem; color: #666;">Rows:</label>
+                        <select name="rows_management" class="form-control" style="width: 80px; padding: 0.25rem 0.5rem; height: auto;" onchange="this.form.submit()">
+                            <option value="5" <?php echo ($rows_management == 5) ? 'selected' : ''; ?>>5</option>
+                            <option value="10" <?php echo ($rows_management == 10) ? 'selected' : ''; ?>>10</option>
+                            <option value="20" <?php echo ($rows_management == 20) ? 'selected' : ''; ?>>20</option>
+                            <option value="50" <?php echo ($rows_management == 50) ? 'selected' : ''; ?>>50</option>
+                            <option value="100" <?php echo ($rows_management == 100) ? 'selected' : ''; ?>>100</option>
+                        </select>
+                        <input type="hidden" name="page_management" value="<?php echo $page_management; ?>">
+                    </form>
+                </div>
+            </div>
         </div>
         
-        <button class="btn btn-success" onclick="showAddUsageModal()" style="margin-bottom: 1rem;">Record Equipment Usage</button>
-        
-        <?php if ($recent_usage && $recent_usage->num_rows > 0): ?>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Date Used</th>
-                        <th>Equipment</th>
-                        <th>Item Name</th>
-                        <th>User's Name</th>
-                        <th>Quantity (Uses)</th>
-                        <th>Purpose</th>
-                        <th>OR Number</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php while($usage = $recent_usage->fetch_assoc()): ?>
+        <!-- Equipment Usage Tab Content -->
+        <div id="usageContent" class="tab-content">
+            <button class="btn btn-success" onclick="showAddUsageModal()" style="margin-bottom: 1rem;">Record Equipment Usage</button>
+            
+            <?php if (count($recent_usage) > 0): ?>
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td><?php echo date('M d, Y', strtotime($usage['date_used'])); ?></td>
-                            <td><?php echo htmlspecialchars($usage['equipment_name']); ?></td>
-                            <td><?php echo htmlspecialchars($usage['item_name']); ?></td>
-                            <td><?php echo htmlspecialchars($usage['user_name']); ?></td>
-                            <td><?php echo $usage['quantity']; ?></td>
-                            <td><?php echo htmlspecialchars(substr($usage['purpose'], 0, 50)) . (strlen($usage['purpose']) > 50 ? '...' : ''); ?></td>
-                            <td><?php echo htmlspecialchars($usage['or_number'] ?? 'N/A'); ?></td>
-                            <td>
-                                <span style="color: <?php echo $usage['status'] == 'functional' ? 'green' : 'red'; ?>; font-weight: bold;">
-                                    <?php echo strtoupper(str_replace('_', ' ', $usage['status'])); ?>
-                                </span>
-                            </td>
+                            <th>Date Used</th>
+                            <th>Equipment</th>
+                            <th>Item Name</th>
+                            <th>User's Name</th>
+                            <th>Quantity (Uses)</th>
+                            <th>Purpose</th>
+                            <th>OR Number</th>
+                            <th>Status</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <p>No usage records found.</p>
-        <?php endif; ?>
-    </div>
-    
-    <!-- Equipment Management -->
-    <div class="card">
-        <div class="card-header">
-            <h2><i class="fas fa-tools"></i> Equipment Management</h2>
+                    </thead>
+                    <tbody>
+                        <?php foreach($recent_usage as $usage): ?>
+                            <tr>
+                                <td><?php echo date('M d, Y', strtotime($usage['date_used'])); ?></td>
+                                <td><?php echo htmlspecialchars($usage['equipment_name']); ?></td>
+                                <td><?php echo htmlspecialchars($usage['item_name']); ?></td>
+                                <td><?php echo htmlspecialchars($usage['user_name']); ?></td>
+                                <td><?php echo $usage['quantity']; ?></td>
+                                <td><?php echo htmlspecialchars(substr($usage['purpose'], 0, 50)) . (strlen($usage['purpose']) > 50 ? '...' : ''); ?></td>
+                                <td><?php echo htmlspecialchars($usage['or_number'] ?? 'N/A'); ?></td>
+                                <td>
+                                    <span style="color: <?php echo $usage['status'] == 'functional' ? 'green' : 'red'; ?>; font-weight: bold;">
+                                        <?php echo strtoupper(str_replace('_', ' ', $usage['status'])); ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                
+                <!-- Pagination for Usage -->
+                <?php if ($total_usage_pages > 1): ?>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
+                        <div style="color: #666;">
+                            Showing <?php echo $offset_usage + 1; ?> to <?php echo min($offset_usage + $rows_usage, $total_usage); ?> of <?php echo $total_usage; ?> entries
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <?php if ($page_usage > 1): ?>
+                                <a href="?rows_usage=<?php echo $rows_usage; ?>&page_usage=<?php echo $page_usage - 1; ?>" class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            <?php endif; ?>
+                            
+                            <?php
+                            $start_page = max(1, $page_usage - 2);
+                            $end_page = min($total_usage_pages, $page_usage + 2);
+                            
+                            if ($start_page > 1): ?>
+                                <a href="?rows_usage=<?php echo $rows_usage; ?>&page_usage=1" class="btn btn-sm btn-secondary">1</a>
+                                <?php if ($start_page > 2): ?>
+                                    <span style="padding: 0.25rem 0.5rem;">...</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                            
+                            <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                                <a href="?rows_usage=<?php echo $rows_usage; ?>&page_usage=<?php echo $i; ?>" 
+                                   class="btn btn-sm <?php echo ($i == $page_usage) ? 'btn-primary' : 'btn-secondary'; ?>">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+                            
+                            <?php if ($end_page < $total_usage_pages): ?>
+                                <?php if ($end_page < $total_usage_pages - 1): ?>
+                                    <span style="padding: 0.25rem 0.5rem;">...</span>
+                                <?php endif; ?>
+                                <a href="?rows_usage=<?php echo $rows_usage; ?>&page_usage=<?php echo $total_usage_pages; ?>" class="btn btn-sm btn-secondary"><?php echo $total_usage_pages; ?></a>
+                            <?php endif; ?>
+                            
+                            <?php if ($page_usage < $total_usage_pages): ?>
+                                <a href="?rows_usage=<?php echo $rows_usage; ?>&page_usage=<?php echo $page_usage + 1; ?>" class="btn btn-sm btn-secondary">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <p>No usage records found.</p>
+            <?php endif; ?>
         </div>
         
-        <button class="btn btn-success" onclick="showAddEquipmentModal()" style="margin-bottom: 1rem;">Add Equipment</button>
-        
-        <?php if ($equipment_list->num_rows > 0): ?>
-            <table class="table">
-                <thead>
-                    <tr>
-                        <th>Name</th>
-                        <th>Model</th>
-                        <th>Serial No.</th>
-                        <th>Section</th>
-                        <th>Status</th>
-                        <th>Purchase Date</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <?php 
-                    $equipment_list->data_seek(0); // Reset pointer
-                    while($equip = $equipment_list->fetch_assoc()): 
-                    ?>
+        <!-- Equipment Management Tab Content -->
+        <div id="managementContent" class="tab-content" style="display: none;">
+            <button class="btn btn-success" onclick="showAddEquipmentModal()" style="margin-bottom: 1rem;">Add Equipment</button>
+            
+            <?php if (count($equipment_list) > 0): ?>
+                <table class="table">
+                    <thead>
                         <tr>
-                            <td><?php echo htmlspecialchars($equip['name']); ?></td>
-                            <td><?php echo htmlspecialchars($equip['model']); ?></td>
-                            <td><?php echo htmlspecialchars($equip['serial_no']); ?></td>
-                            <td><?php echo htmlspecialchars($equip['section_name']); ?></td>
-                            <td><?php echo strtoupper(str_replace('_', ' ', $equip['status'])); ?></td>
-                            <td><?php echo $equip['purchase_date'] ? date('M d, Y', strtotime($equip['purchase_date'])) : 'N/A'; ?></td>
-                            <td class="table-actions">
-                                <a href="equipment_details.php?id=<?php echo $equip['equipment_id']; ?>" class="btn btn-info btn-sm">Details</a>
-                                <button class="btn btn-warning btn-sm" onclick="editEquipment(<?php echo htmlspecialchars(json_encode($equip)); ?>)">Edit</button>
-                                <form method="POST" style="display: inline;" onsubmit="return confirm('Delete this equipment?');">
-                                    <input type="hidden" name="action" value="delete_equipment">
-                                    <input type="hidden" name="equipment_id" value="<?php echo $equip['equipment_id']; ?>">
-                                    <button type="submit" class="btn btn-danger btn-sm">Delete</button>
-                                </form>
-                            </td>
+                            <th>Name</th>
+                            <th>Model</th>
+                            <th>Serial No.</th>
+                            <th>Section</th>
+                            <th>Status</th>
+                            <th>Purchase Date</th>
+                            <th>Actions</th>
                         </tr>
-                    <?php endwhile; ?>
-                </tbody>
-            </table>
-        <?php else: ?>
-            <p>No equipment found.</p>
-        <?php endif; ?>
+                    </thead>
+                    <tbody>
+                        <?php foreach($equipment_list as $equip): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($equip['name']); ?></td>
+                                <td><?php echo htmlspecialchars($equip['model']); ?></td>
+                                <td><?php echo htmlspecialchars($equip['serial_no']); ?></td>
+                                <td><?php echo htmlspecialchars($equip['section_name']); ?></td>
+                                <td><?php echo strtoupper(str_replace('_', ' ', $equip['status'])); ?></td>
+                                <td><?php echo $equip['purchase_date'] ? date('M d, Y', strtotime($equip['purchase_date'])) : 'N/A'; ?></td>
+                                <td class="table-actions">
+                                    <a href="equipment_details.php?id=<?php echo $equip['equipment_id']; ?>" class="btn btn-info btn-sm">Details</a>
+                                    <button class="btn btn-warning btn-sm" onclick="editEquipment(<?php echo htmlspecialchars(json_encode($equip)); ?>)">Edit</button>
+                                    <form method="POST" style="display: inline;" onsubmit="return confirm('Delete this equipment?');">
+                                        <input type="hidden" name="action" value="delete_equipment">
+                                        <input type="hidden" name="equipment_id" value="<?php echo $equip['equipment_id']; ?>">
+                                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                
+                <!-- Pagination for Management -->
+                <?php if ($total_equipment_pages > 1): ?>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 5px;">
+                        <div style="color: #666;">
+                            Showing <?php echo $offset_management + 1; ?> to <?php echo min($offset_management + $rows_management, $total_equipment); ?> of <?php echo $total_equipment; ?> entries
+                        </div>
+                        <div style="display: flex; gap: 0.5rem;">
+                            <?php if ($page_management > 1): ?>
+                                <a href="?rows_management=<?php echo $rows_management; ?>&page_management=<?php echo $page_management - 1; ?>" class="btn btn-sm btn-secondary">
+                                    <i class="fas fa-chevron-left"></i> Previous
+                                </a>
+                            <?php endif; ?>
+                            
+                            <?php
+                            $start_page = max(1, $page_management - 2);
+                            $end_page = min($total_equipment_pages, $page_management + 2);
+                            
+                            if ($start_page > 1): ?>
+                                <a href="?rows_management=<?php echo $rows_management; ?>&page_management=1" class="btn btn-sm btn-secondary">1</a>
+                                <?php if ($start_page > 2): ?>
+                                    <span style="padding: 0.25rem 0.5rem;">...</span>
+                                <?php endif; ?>
+                            <?php endif; ?>
+                            
+                            <?php for ($i = $start_page; $i <= $end_page; $i++): ?>
+                                <a href="?rows_management=<?php echo $rows_management; ?>&page_management=<?php echo $i; ?>" 
+                                   class="btn btn-sm <?php echo ($i == $page_management) ? 'btn-primary' : 'btn-secondary'; ?>">
+                                    <?php echo $i; ?>
+                                </a>
+                            <?php endfor; ?>
+                            
+                            <?php if ($end_page < $total_equipment_pages): ?>
+                                <?php if ($end_page < $total_equipment_pages - 1): ?>
+                                    <span style="padding: 0.25rem 0.5rem;">...</span>
+                                <?php endif; ?>
+                                <a href="?rows_management=<?php echo $rows_management; ?>&page_management=<?php echo $total_equipment_pages; ?>" class="btn btn-sm btn-secondary"><?php echo $total_equipment_pages; ?></a>
+                            <?php endif; ?>
+                            
+                            <?php if ($page_management < $total_equipment_pages): ?>
+                                <a href="?rows_management=<?php echo $rows_management; ?>&page_management=<?php echo $page_management + 1; ?>" class="btn btn-sm btn-secondary">
+                                    Next <i class="fas fa-chevron-right"></i>
+                                </a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                <?php endif; ?>
+            <?php else: ?>
+                <p>No equipment found.</p>
+            <?php endif; ?>
+        </div>
     </div>
 </div>
 
@@ -363,14 +595,11 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     <label>Equipment *</label>
                     <select name="equipment_id" class="form-control" required>
                         <option value="">Select Equipment</option>
-                        <?php 
-                        $equipment_list->data_seek(0);
-                        while($equip = $equipment_list->fetch_assoc()): 
-                        ?>
+                        <?php foreach($equipment_items as $equip): ?>
                             <option value="<?php echo $equip['equipment_id']; ?>">
                                 <?php echo htmlspecialchars($equip['name']) . ' - ' . htmlspecialchars($equip['model']); ?>
                             </option>
-                        <?php endwhile; ?>
+                        <?php endforeach; ?>
                     </select>
                 </div>
                 
@@ -566,6 +795,34 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
 </div>
 
 <script>
+function switchTab(tab) {
+    // Hide all tab contents
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.style.display = 'none';
+    });
+    
+    // Remove active class from all tabs
+    document.querySelectorAll('.tab-button').forEach(button => {
+        button.style.borderBottom = '3px solid transparent';
+        button.style.color = '#666';
+    });
+    
+    // Show selected tab content and activate tab
+    if (tab === 'usage') {
+        document.getElementById('usageContent').style.display = 'block';
+        document.getElementById('usageTab').style.borderBottom = '3px solid #007bff';
+        document.getElementById('usageTab').style.color = '#007bff';
+        document.getElementById('usageRowsForm').style.display = 'flex';
+        document.getElementById('managementRowsForm').style.display = 'none';
+    } else if (tab === 'management') {
+        document.getElementById('managementContent').style.display = 'block';
+        document.getElementById('managementTab').style.borderBottom = '3px solid #007bff';
+        document.getElementById('managementTab').style.color = '#007bff';
+        document.getElementById('usageRowsForm').style.display = 'none';
+        document.getElementById('managementRowsForm').style.display = 'flex';
+    }
+}
+
 function showAddUsageModal() {
     document.getElementById('addUsageModal').style.display = 'block';
 }

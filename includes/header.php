@@ -15,8 +15,8 @@ require_once __DIR__ . '/auth.php';
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
     
-    <!-- Font Awesome Kit -->
-    <script src="https://kit.fontawesome.com/e4a261e8da.js" crossorigin="anonymous"></script>
+    <!-- Font Awesome CDN - FIXED VERSION -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
     <!-- Custom Styles -->
     <link rel="stylesheet" href="../assets/css/style.css">
@@ -46,8 +46,8 @@ require_once __DIR__ . '/auth.php';
                         <i class="fas fa-user-circle"></i>
                     </div>
                     <div class="user-info">
-                        <span class="user-name"><?php echo htmlspecialchars($_SESSION['username'] ?? 'User'); ?></span>
-                        <span class="user-role"><?php echo htmlspecialchars($_SESSION['role_name'] ?? 'Employee'); ?></span>
+                        <span class="user-name"><?php echo htmlspecialchars(get_user_name()); ?></span>
+                        <span class="user-role"><?php echo htmlspecialchars($_SESSION['role_display'] ?? get_user_role() ?? 'Employee'); ?></span>
                     </div>
                     <i class="fas fa-chevron-down"></i>
                 </button>

@@ -8,92 +8,164 @@ $message = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] == 'stock_in') {
-            $item_id = $_POST['item_id'];
-            $quantity = intval($_POST['quantity']);
+            $item_ids = $_POST['item_id'];
+            $quantities = $_POST['quantity'];
             $performed_by = $_SESSION['user_id'] ?? 1;
             $supplier = !empty($_POST['supplier']) ? $_POST['supplier'] : NULL;
             $reference_number = !empty($_POST['reference_number']) ? $_POST['reference_number'] : NULL;
             $expiry_date = !empty($_POST['expiry_date']) ? $_POST['expiry_date'] : NULL;
             $remarks = !empty($_POST['remarks']) ? $_POST['remarks'] : NULL;
             
-            $stmt = $conn->prepare("INSERT INTO stock_in (item_id, quantity, performed_by, supplier, reference_number, expiry_date, remarks, datetime_added) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
-            $stmt->bind_param("iiissss", $item_id, $quantity, $performed_by, $supplier, $reference_number, $expiry_date, $remarks);
+            $success_count = 0;
+            $error_count = 0;
+            $added_items = [];
             
-            if ($stmt->execute()) {
-                $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
-                log_activity($conn, get_user_id(), "Added stock: $quantity unit(s) of $item_name (Item ID: $item_id)", 1);
-                $message = '<div class="alert alert-success">Stock added successfully!</div>';
-            } else {
-                $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
-            }
-        } elseif ($_POST['action'] == 'stock_out') {
-            $item_id = $_POST['item_id'];
-            $quantity = intval($_POST['quantity']);
-            $performed_by = $_SESSION['user_id'] ?? 1;
-            $reference_number = !empty($_POST['reference_number']) ? $_POST['reference_number'] : NULL;
-            $remarks = $_POST['remarks'];
-            
-            // Check current stock to prevent negative
-            $stock_check = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as current_stock 
-                                         FROM item i 
-                                         LEFT JOIN stock_in si ON i.item_id = si.item_id 
-                                         LEFT JOIN stock_out so ON i.item_id = so.item_id 
-                                         WHERE i.item_id = $item_id 
-                                         GROUP BY i.item_id")->fetch_assoc();
-            
-            $current_stock = $stock_check ? $stock_check['current_stock'] : 0;
-            
-            if ($current_stock < $quantity) {
-                $message = '<div class="alert alert-danger">Error: Insufficient stock! Current stock: ' . $current_stock . '</div>';
-            } else {
-                $stmt = $conn->prepare("INSERT INTO stock_out (item_id, quantity, performed_by, reference_number, remarks, datetime_added) VALUES (?, ?, ?, ?, ?, NOW())");
-                $stmt->bind_param("iiiss", $item_id, $quantity, $performed_by, $reference_number, $remarks);
+            // Loop through all items
+            for ($i = 0; $i < count($item_ids); $i++) {
+                $item_id = intval($item_ids[$i]);
+                $quantity = intval($quantities[$i]);
                 
-                if ($stmt->execute()) {
-                    $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
-                    log_activity($conn, get_user_id(), "Removed stock: $quantity unit(s) of $item_name (Item ID: $item_id)", 1);
-                    $message = '<div class="alert alert-success">Stock removed successfully!</div>';
-                } else {
-                    $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
+                if ($item_id > 0 && $quantity > 0) {
+                    $stmt = $conn->prepare("INSERT INTO stock_in (item_id, quantity, performed_by, supplier, reference_number, expiry_date, remarks, datetime_added) VALUES (?, ?, ?, ?, ?, ?, ?, NOW())");
+                    $stmt->bind_param("iiissss", $item_id, $quantity, $performed_by, $supplier, $reference_number, $expiry_date, $remarks);
+                    
+                    if ($stmt->execute()) {
+                        $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
+                        $added_items[] = "$quantity unit(s) of $item_name";
+                        $success_count++;
+                    } else {
+                        $error_count++;
+                    }
+                    $stmt->close();
                 }
             }
+            
+            if ($success_count > 0) {
+                $items_list = implode(', ', $added_items);
+                log_activity($conn, get_user_id(), "Added stock (bulk): $items_list", 1);
+                $message = '<div class="alert alert-success">Successfully added ' . $success_count . ' item(s) to stock!</div>';
+                if ($error_count > 0) {
+                    $message .= '<div class="alert alert-warning">' . $error_count . ' item(s) failed to add.</div>';
+                }
+            } else {
+                $message = '<div class="alert alert-danger">Error adding stock items.</div>';
+            }
+        } elseif ($_POST['action'] == 'stock_out') {
+            $item_ids = $_POST['item_id'];
+            $quantities = $_POST['quantity'];
+            $performed_by = $_SESSION['user_id'] ?? 1;
+            $reference_number = !empty($_POST['reference_number']) ? $_POST['reference_number'] : NULL;
+            $remarks = !empty($_POST['remarks']) ? $_POST['remarks'] : 'Stock out';
+            
+            $success_count = 0;
+            $error_count = 0;
+            $errors = [];
+            $removed_items = [];
+            
+            // Loop through all items
+            for ($i = 0; $i < count($item_ids); $i++) {
+                $item_id = intval($item_ids[$i]);
+                $quantity = intval($quantities[$i]);
+                
+                if ($item_id > 0 && $quantity > 0) {
+                    // Check current stock to prevent negative
+                    $stock_check = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as current_stock 
+                                                 FROM item i 
+                                                 LEFT JOIN stock_in si ON i.item_id = si.item_id 
+                                                 LEFT JOIN stock_out so ON i.item_id = so.item_id 
+                                                 WHERE i.item_id = $item_id 
+                                                 GROUP BY i.item_id")->fetch_assoc();
+                    
+                    $current_stock = $stock_check ? $stock_check['current_stock'] : 0;
+                    $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
+                    
+                    if ($current_stock < $quantity) {
+                        $errors[] = "$item_name: Insufficient stock (Available: $current_stock)";
+                        $error_count++;
+                    } else {
+                        $stmt = $conn->prepare("INSERT INTO stock_out (item_id, quantity, performed_by, reference_number, remarks, datetime_added) VALUES (?, ?, ?, ?, ?, NOW())");
+                        $stmt->bind_param("iiiss", $item_id, $quantity, $performed_by, $reference_number, $remarks);
+                        
+                        if ($stmt->execute()) {
+                            $removed_items[] = "$quantity unit(s) of $item_name";
+                            $success_count++;
+                        } else {
+                            $error_count++;
+                        }
+                        $stmt->close();
+                    }
+                }
+            }
+            
+            if ($success_count > 0) {
+                $items_list = implode(', ', $removed_items);
+                log_activity($conn, get_user_id(), "Removed stock (bulk): $items_list", 1);
+                $message = '<div class="alert alert-success">Successfully removed ' . $success_count . ' item(s) from stock!</div>';
+            }
+            if ($error_count > 0) {
+                $message .= '<div class="alert alert-danger">Failed: ' . implode(', ', $errors) . '</div>';
+            }
         } elseif ($_POST['action'] == 'stock_usage') {
-            $item_id = $_POST['item_id'];
-            $quantity = intval($_POST['quantity']);
+            $item_ids = $_POST['item_id'];
+            $quantities = $_POST['quantity'];
             $employee_id = $_POST['employee_id'];
             $purpose = $_POST['purpose'];
             $or_number = $_POST['or_number'];
             
-            // Check current stock to prevent negative
-            $stock_check = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as current_stock 
-                                         FROM item i 
-                                         LEFT JOIN stock_in si ON i.item_id = si.item_id 
-                                         LEFT JOIN stock_out so ON i.item_id = so.item_id 
-                                         WHERE i.item_id = $item_id 
-                                         GROUP BY i.item_id")->fetch_assoc();
+            // Get employee details
+            $emp = $conn->query("SELECT firstname, middlename, lastname FROM employee WHERE employee_id = $employee_id")->fetch_assoc();
             
-            $current_stock = $stock_check ? $stock_check['current_stock'] : 0;
+            $success_count = 0;
+            $error_count = 0;
+            $errors = [];
+            $used_items = [];
+            $performed_by = $_SESSION['user_id'] ?? 1;
             
-            if ($current_stock < $quantity) {
-                $message = '<div class="alert alert-danger">Error: Insufficient stock! Current stock: ' . $current_stock . '</div>';
-            } else {
-                // Get employee details
-                $emp = $conn->query("SELECT firstname, middlename, lastname FROM employee WHERE employee_id = $employee_id")->fetch_assoc();
+            // Loop through all items
+            for ($i = 0; $i < count($item_ids); $i++) {
+                $item_id = intval($item_ids[$i]);
+                $quantity = intval($quantities[$i]);
                 
-                $stmt = $conn->prepare("INSERT INTO stock_usage (item_id, quantity, employee_id, firstname, middlename, lastname, purpose, or_number, datetime_added) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
-                $stmt->bind_param("iiisssss", $item_id, $quantity, $employee_id, $emp['firstname'], $emp['middlename'], $emp['lastname'], $purpose, $or_number);
-                
-                if ($stmt->execute()) {
-                    // Also create stock_out record
-                    $performed_by = $_SESSION['user_id'] ?? 1;
-                    $conn->query("INSERT INTO stock_out (item_id, quantity, performed_by, remarks, datetime_added) VALUES ($item_id, $quantity, $performed_by, 'Used by: $or_number - $purpose', NOW())");
+                if ($item_id > 0 && $quantity > 0) {
+                    // Check current stock to prevent negative
+                    $stock_check = $conn->query("SELECT COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as current_stock 
+                                                 FROM item i 
+                                                 LEFT JOIN stock_in si ON i.item_id = si.item_id 
+                                                 LEFT JOIN stock_out so ON i.item_id = so.item_id 
+                                                 WHERE i.item_id = $item_id 
+                                                 GROUP BY i.item_id")->fetch_assoc();
+                    
+                    $current_stock = $stock_check ? $stock_check['current_stock'] : 0;
                     $item_name = $conn->query("SELECT label FROM item WHERE item_id = $item_id")->fetch_assoc()['label'];
-                    $user_name = $emp['firstname'] . ' ' . $emp['lastname'];
-                    log_activity($conn, get_user_id(), "Recorded stock usage: $quantity unit(s) of $item_name by $user_name (OR: $or_number)", 1);
-                    $message = '<div class="alert alert-success">Stock usage recorded successfully!</div>';
-                } else {
-                    $message = '<div class="alert alert-danger">Error: ' . $stmt->error . '</div>';
+                    
+                    if ($current_stock < $quantity) {
+                        $errors[] = "$item_name: Insufficient stock (Available: $current_stock)";
+                        $error_count++;
+                    } else {
+                        $stmt = $conn->prepare("INSERT INTO stock_usage (item_id, quantity, employee_id, firstname, middlename, lastname, purpose, or_number, datetime_added) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW())");
+                        $stmt->bind_param("iiisssss", $item_id, $quantity, $employee_id, $emp['firstname'], $emp['middlename'], $emp['lastname'], $purpose, $or_number);
+                        
+                        if ($stmt->execute()) {
+                            // Also create stock_out record
+                            $conn->query("INSERT INTO stock_out (item_id, quantity, performed_by, remarks, datetime_added) VALUES ($item_id, $quantity, $performed_by, 'Used by: $or_number - $purpose', NOW())");
+                            $used_items[] = "$quantity unit(s) of $item_name";
+                            $success_count++;
+                        } else {
+                            $error_count++;
+                        }
+                        $stmt->close();
+                    }
                 }
+            }
+            
+            if ($success_count > 0) {
+                $items_list = implode(', ', $used_items);
+                $user_name = $emp['firstname'] . ' ' . $emp['lastname'];
+                log_activity($conn, get_user_id(), "Recorded stock usage (bulk): $items_list by $user_name (OR: $or_number)", 1);
+                $message = '<div class="alert alert-success">Successfully recorded usage of ' . $success_count . ' item(s)!</div>';
+            }
+            if ($error_count > 0) {
+                $message .= '<div class="alert alert-danger">Failed: ' . implode(', ', $errors) . '</div>';
             }
         }
     }
@@ -115,6 +187,19 @@ FROM item i
 LEFT JOIN (SELECT item_id, SUM(quantity) as total_in FROM stock_in GROUP BY item_id) si ON i.item_id = si.item_id
 LEFT JOIN (SELECT item_id, SUM(quantity) as total_out FROM stock_out GROUP BY item_id) so ON i.item_id = so.item_id";
 $stats = $conn->query($stats_query)->fetch_assoc();
+
+// Get today's statistics
+$today = date('Y-m-d');
+$today_stats = [
+    'items_added' => $conn->query("SELECT COUNT(DISTINCT item_id) as count FROM stock_in WHERE DATE(datetime_added) = '$today'")->fetch_assoc()['count'],
+    'items_out' => $conn->query("SELECT COUNT(DISTINCT item_id) as count FROM stock_out WHERE DATE(datetime_added) = '$today'")->fetch_assoc()['count'],
+    'low_stock_today' => $conn->query("SELECT COUNT(DISTINCT i.item_id) as count FROM item i 
+        LEFT JOIN (SELECT item_id, SUM(quantity) as total_in FROM stock_in GROUP BY item_id) si ON i.item_id = si.item_id
+        LEFT JOIN (SELECT item_id, SUM(quantity) as total_out FROM stock_out GROUP BY item_id) so ON i.item_id = so.item_id
+        WHERE (COALESCE(si.total_in, 0) - COALESCE(so.total_out, 0)) > 0 
+        AND (COALESCE(si.total_in, 0) - COALESCE(so.total_out, 0)) <= i.reorder_level")->fetch_assoc()['count'],
+    'expiring_today' => $conn->query("SELECT COUNT(*) as count FROM stock_in WHERE DATE(expiry_date) = '$today'")->fetch_assoc()['count']
+];
 
 $expiring_count = $expiry_alerts ? $expiry_alerts->num_rows : 0;
 
@@ -192,26 +277,58 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
         </div>
         
         <!-- Summary Statistics -->
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-            <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold;"><?php echo $stats['total_items']; ?></div>
-                <div style="opacity: 0.9;">Total Items</div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1.5rem; margin-bottom: 2rem;">
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+                <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Total Items</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #667eea;"><?php echo $stats['total_items']; ?></div>
+                    <div style="color: #28a745; font-size: 1.25rem; font-weight: 600;">
+                        <i class="fas fa-arrow-up" style="font-size: 0.9rem;"></i> <?php echo $today_stats['items_added']; ?>
+                    </div>
+                </div>
+                <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                    Added today: <?php echo $today_stats['items_added']; ?> items
+                </div>
             </div>
             
-            <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold;"><?php echo $stats['out_of_stock_count']; ?></div>
-                <div style="opacity: 0.9;">Out of Stock</div>
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+                <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Out of Stock</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #dc3545;"><?php echo $stats['out_of_stock_count']; ?></div>
+                    <div style="color: #dc3545; font-size: 1.25rem; font-weight: 600;">
+                        <i class="fas fa-exclamation-circle" style="font-size: 0.9rem;"></i> <?php echo $today_stats['items_out']; ?>
+                    </div>
+                </div>
+                <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                    Stock out today: <?php echo $today_stats['items_out']; ?> items
+                </div>
             </div>
             
-            <div style="background: linear-gradient(135deg, #fa709a 0%, #fee140 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold;"><?php echo $stats['low_stock_count']; ?></div>
-                <div style="opacity: 0.9;">Low Stock</div>
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+                <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Low Stock</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #ffc107;"><?php echo $stats['low_stock_count']; ?></div>
+                    <div style="color: #ffc107; font-size: 1.25rem; font-weight: 600;">
+                        <i class="fas fa-exclamation-triangle" style="font-size: 0.9rem;"></i> <?php echo $today_stats['low_stock_today']; ?>
+                    </div>
+                </div>
+                <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                    Low stock alerts: <?php echo $today_stats['low_stock_today']; ?> items
+                </div>
             </div>
             
             <?php if ($expiring_count > 0): ?>
-            <div style="background: linear-gradient(135deg, #ff9a56 0%, #ff6a00 100%); color: white; padding: 1.5rem; border-radius: 8px; text-align: center;">
-                <div style="font-size: 2rem; font-weight: bold;"><?php echo $expiring_count; ?></div>
-                <div style="opacity: 0.9;">Expiring Soon</div>
+            <div style="background: white; padding: 1.5rem; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+                <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Expiring Soon</div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-size: 2rem; font-weight: bold; color: #ff6b6b;"><?php echo $expiring_count; ?></div>
+                    <div style="color: #ff6b6b; font-size: 1.25rem; font-weight: 600;">
+                        <i class="fas fa-clock" style="font-size: 0.9rem;"></i> <?php echo $today_stats['expiring_today']; ?>
+                    </div>
+                </div>
+                <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                    Expiring today: <?php echo $today_stats['expiring_today']; ?> items
+                </div>
             </div>
             <?php endif; ?>
         </div>
@@ -224,37 +341,33 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
     
     <!-- Expiry Alerts -->
     <?php if ($expiry_alerts && $expiry_alerts->num_rows > 0): ?>
-    <div class="card" style="border-left: 4px solid #ff5722;">
-        <div class="card-header" style="background-color: #ffe0b2;">
+    <div class="card">
+        <div class="card-header">
             <h2>⏰ Expiry Alerts</h2>
         </div>
         
         <table class="table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Section</th>
-                    <th>Quantity</th>
-                    <th>Expiry Date</th>
-                    <th>Days Left</th>
-                    <th>Supplier</th>
-                    <th>Status</th>
+            <thead style="background-color: #C2185B !important; color: white !important;">
+                <tr style="background-color: #C2185B !important;">
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Item</th>
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Section</th>
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Quantity</th>
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Expiry Date</th>
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Days Left</th>
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Supplier</th>
+                    <th style="background-color: #C2185B !important; color: white !important; padding: 12px;">Status</th>
                 </tr>
             </thead>
             <tbody>
-                <?php while($alert = $expiry_alerts->fetch_assoc()): 
-                    $status_color = '';
-                    if ($alert['expiry_status'] == 'expired') $status_color = 'style="background-color: #ffcdd2;"';
-                    elseif ($alert['expiry_status'] == 'expiring_soon') $status_color = 'style="background-color: #fff9c4;"';
-                ?>
-                    <tr <?php echo $status_color; ?>>
-                        <td><?php echo htmlspecialchars($alert['item_name']); ?></td>
-                        <td><?php echo htmlspecialchars($alert['section_name']); ?></td>
-                        <td><?php echo $alert['quantity']; ?></td>
-                        <td><?php echo date('M d, Y', strtotime($alert['expiry_date'])); ?></td>
-                        <td><?php echo $alert['days_until_expiry']; ?> days</td>
-                        <td><?php echo htmlspecialchars($alert['supplier'] ?? 'N/A'); ?></td>
-                        <td>
+                <?php while($alert = $expiry_alerts->fetch_assoc()): ?>
+                    <tr style="background-color: #FFE4E9; color: black;">
+                        <td style="color: black;"><?php echo htmlspecialchars($alert['item_name']); ?></td>
+                        <td style="color: black;"><?php echo htmlspecialchars($alert['section_name']); ?></td>
+                        <td style="color: black;"><?php echo $alert['quantity']; ?></td>
+                        <td style="color: black;"><?php echo date('M d, Y', strtotime($alert['expiry_date'])); ?></td>
+                        <td style="color: black;"><?php echo $alert['days_until_expiry']; ?> days</td>
+                        <td style="color: black;"><?php echo htmlspecialchars($alert['supplier'] ?? 'N/A'); ?></td>
+                        <td style="color: black;">
                             <?php if ($alert['expiry_status'] == 'expired'): ?>
                                 <span style="color: red; font-weight: bold;">EXPIRED</span>
                             <?php else: ?>
@@ -334,23 +447,33 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                 <form method="POST" id="stockInForm">
                     <input type="hidden" name="action" value="stock_in">
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group">
-                            <label>Item *</label>
-                            <select name="item_id" class="form-control" required>
-                                <option value="">Select Item</option>
-                                <?php 
-                                $items = $conn->query("SELECT * FROM item ORDER BY label");
-                                while($item = $items->fetch_assoc()): 
-                                ?>
-                                    <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                                <?php endwhile; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Quantity *</label>
-                            <input type="number" name="quantity" class="form-control" required min="1">
+                    <div id="stockInItems">
+                        <div class="stock-item-row" style="position: relative; margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
+                                <div class="form-group">
+                                    <label>Item *</label>
+                                    <select name="item_id[]" class="form-control" required>
+                                        <option value="">Select Item</option>
+                                        <?php 
+                                        $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                        while($item = $items->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Quantity *</label>
+                                    <input type="number" name="quantity[]" class="form-control" required min="1">
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 1.7rem;">
+                                    <button type="button" class="btn btn-success btn-sm" onclick="addStockInRow()" title="Add another item">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -388,24 +511,34 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                 <form method="POST" id="stockOutForm" onsubmit="return confirmStockOut()">
                     <input type="hidden" name="action" value="stock_out">
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group">
-                            <label>Item *</label>
-                            <select name="item_id" id="stockOutItem" class="form-control" required onchange="checkStock(this.value, 'stockOutQty')">
-                                <option value="">Select Item</option>
-                                <?php 
-                                $items = $conn->query("SELECT * FROM item ORDER BY label");
-                                while($item = $items->fetch_assoc()): 
-                                ?>
-                                    <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                                <?php endwhile; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Quantity *</label>
-                            <input type="number" name="quantity" id="stockOutQty" class="form-control" required min="1">
-                            <small id="stockOutAvailable" style="color: #666;"></small>
+                    <div id="stockOutItems">
+                        <div class="stock-item-row" style="position: relative; margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
+                                <div class="form-group">
+                                    <label>Item *</label>
+                                    <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
+                                        <option value="">Select Item</option>
+                                        <?php 
+                                        $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                        while($item = $items->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Quantity *</label>
+                                    <input type="number" name="quantity[]" class="form-control" required min="1">
+                                    <small class="stock-available" style="color: #666;"></small>
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 1.7rem;">
+                                    <button type="button" class="btn btn-success btn-sm" onclick="addStockOutRow()" title="Add another item">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -431,24 +564,34 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                 <form method="POST" id="usageForm" onsubmit="return confirmUsage()">
                     <input type="hidden" name="action" value="stock_usage">
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
-                        <div class="form-group">
-                            <label>Item *</label>
-                            <select name="item_id" id="usageItem" class="form-control" required onchange="checkStock(this.value, 'usageQty')">
-                                <option value="">Select Item</option>
-                                <?php 
-                                $items = $conn->query("SELECT * FROM item ORDER BY label");
-                                while($item = $items->fetch_assoc()): 
-                                ?>
-                                    <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                                <?php endwhile; ?>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label>Quantity *</label>
-                            <input type="number" name="quantity" id="usageQty" class="form-control" required min="1" value="1">
-                            <small id="usageAvailable" style="color: #666;"></small>
+                    <div id="stockUsageItems">
+                        <div class="stock-item-row" style="position: relative; margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
+                                <div class="form-group">
+                                    <label>Item *</label>
+                                    <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
+                                        <option value="">Select Item</option>
+                                        <?php 
+                                        $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                        while($item = $items->fetch_assoc()): 
+                                        ?>
+                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                        <?php endwhile; ?>
+                                    </select>
+                                </div>
+                                
+                                <div class="form-group">
+                                    <label>Quantity *</label>
+                                    <input type="number" name="quantity[]" class="form-control" required min="1" value="1">
+                                    <small class="stock-available" style="color: #666;"></small>
+                                </div>
+                                
+                                <div class="form-group" style="margin-top: 1.7rem;">
+                                    <button type="button" class="btn btn-success btn-sm" onclick="addStockUsageRow()" title="Add another item">
+                                        <i class="fas fa-plus"></i>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     
@@ -799,6 +942,166 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 3000);
     });
 });
+
+// Add new Stock In row
+function addStockInRow() {
+    const container = document.getElementById('stockInItems');
+    const rowCount = container.querySelectorAll('.stock-item-row').length;
+    
+    const newRow = document.createElement('div');
+    newRow.className = 'stock-item-row';
+    newRow.style.cssText = 'position: relative; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px dashed #ddd;';
+    
+    newRow.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
+            <div class="form-group">
+                <label>Item *</label>
+                <select name="item_id[]" class="form-control" required>
+                    <option value="">Select Item</option>
+                    <?php 
+                    $items = $conn->query("SELECT * FROM item ORDER BY label");
+                    while($item = $items->fetch_assoc()): 
+                    ?>
+                        <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Quantity *</label>
+                <input type="number" name="quantity[]" class="form-control" required min="1">
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.7rem;">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)" title="Remove this item">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(newRow);
+}
+
+// Add new Stock Out row
+function addStockOutRow() {
+    const container = document.getElementById('stockOutItems');
+    const rowCount = container.querySelectorAll('.stock-item-row').length;
+    
+    const newRow = document.createElement('div');
+    newRow.className = 'stock-item-row';
+    newRow.style.cssText = 'position: relative; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px dashed #ddd;';
+    
+    newRow.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
+            <div class="form-group">
+                <label>Item *</label>
+                <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
+                    <option value="">Select Item</option>
+                    <?php 
+                    $items = $conn->query("SELECT * FROM item ORDER BY label");
+                    while($item = $items->fetch_assoc()): 
+                    ?>
+                        <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Quantity *</label>
+                <input type="number" name="quantity[]" class="form-control" required min="1">
+                <small class="stock-available" style="color: #666;"></small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.7rem;">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)" title="Remove this item">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(newRow);
+}
+
+// Remove a stock row
+function removeStockRow(button) {
+    const row = button.closest('.stock-item-row');
+    const container = row.parentElement;
+    
+    // Don't remove if it's the only row
+    if (container.querySelectorAll('.stock-item-row').length > 1) {
+        row.remove();
+    } else {
+        alert('At least one item is required.');
+    }
+}
+
+// Add new Stock Usage row
+function addStockUsageRow() {
+    const container = document.getElementById('stockUsageItems');
+    const rowCount = container.querySelectorAll('.stock-item-row').length;
+    
+    const newRow = document.createElement('div');
+    newRow.className = 'stock-item-row';
+    newRow.style.cssText = 'position: relative; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px dashed #ddd;';
+    
+    newRow.innerHTML = `
+        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
+            <div class="form-group">
+                <label>Item *</label>
+                <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
+                    <option value="">Select Item</option>
+                    <?php 
+                    $items = $conn->query("SELECT * FROM item ORDER BY label");
+                    while($item = $items->fetch_assoc()): 
+                    ?>
+                        <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                    <?php endwhile; ?>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>Quantity *</label>
+                <input type="number" name="quantity[]" class="form-control" required min="1" value="1">
+                <small class="stock-available" style="color: #666;"></small>
+            </div>
+            
+            <div class="form-group" style="margin-top: 1.7rem;">
+                <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)" title="Remove this item">
+                    <i class="fas fa-minus"></i>
+                </button>
+            </div>
+        </div>
+    `;
+    
+    container.appendChild(newRow);
+}
+
+// Check stock for specific row in Stock Out and Stock Usage
+function checkStockForRow(selectElement) {
+    const itemId = selectElement.value;
+    if (!itemId) return;
+    
+    const row = selectElement.closest('.stock-item-row');
+    const availableSpan = row.querySelector('.stock-available');
+    const qtyField = row.querySelector('input[name="quantity[]"]');
+    
+    fetch('check_stock.php?item_id=' + itemId)
+        .then(response => response.json())
+        .then(data => {
+            if (availableSpan) {
+                availableSpan.textContent = 'Available: ' + data.current_stock + ' ' + data.unit;
+                availableSpan.style.color = data.current_stock > 0 ? '#4CAF50' : '#f44336';
+                availableSpan.style.fontWeight = 'bold';
+            }
+            
+            if (qtyField) {
+                qtyField.max = data.current_stock;
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
 </script>
 
 <?php include '../includes/footer.php'; ?>
