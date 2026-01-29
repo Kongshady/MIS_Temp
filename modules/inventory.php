@@ -306,9 +306,23 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
             <h2>📋 Stock Management</h2>
         </div>
         
-        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+        <!-- Tab Navigation -->
+        <div class="tab-navigation" style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 0; background: #f5f5f5;">
+            <button class="tab-btn active" onclick="switchTab('stock-in')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
+                ➕ Stock In
+            </button>
+            <button class="tab-btn" onclick="switchTab('stock-out')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
+                ➖ Stock Out
+            </button>
+            <button class="tab-btn" onclick="switchTab('stock-usage')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
+                📝 Stock Usage
+            </button>
+        </div>
+        
+        <!-- Tab Content -->
+        <div style="padding: 1.5rem;">
             <!-- Stock In Form - Green Theme -->
-            <div style="border: 2px solid #4CAF50; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e8f5e9 0%, white 100%);">
+            <div id="stock-in" class="tab-content" style="display: block; border: 2px solid #4CAF50; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e8f5e9 0%, white 100%);">
                 <h3 style="color: #4CAF50; margin-bottom: 1rem;">➕ Stock In</h3>
                 <form method="POST" id="stockInForm">
                     <input type="hidden" name="action" value="stock_in">
@@ -356,7 +370,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
             </div>
             
             <!-- Stock Out Form - Red Theme -->
-            <div style="border: 2px solid #f44336; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #ffebee 0%, white 100%);">
+            <div id="stock-out" class="tab-content" style="display: none; border: 2px solid #f44336; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #ffebee 0%, white 100%);">
                 <h3 style="color: #f44336; margin-bottom: 1rem;">➖ Stock Out</h3>
                 <form method="POST" id="stockOutForm" onsubmit="return confirmStockOut()">
                     <input type="hidden" name="action" value="stock_out">
@@ -395,7 +409,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
             </div>
             
             <!-- Stock Usage Form - Blue Theme -->
-            <div style="border: 2px solid #2196F3; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e3f2fd 0%, white 100%);">
+            <div id="stock-usage" class="tab-content" style="display: none; border: 2px solid #2196F3; border-radius: 8px; padding: 1.5rem; background: linear-gradient(to bottom, #e3f2fd 0%, white 100%);">
                 <h3 style="color: #2196F3; margin-bottom: 1rem;">📝 Record Usage</h3>
                 <form method="POST" id="usageForm" onsubmit="return confirmUsage()">
                     <input type="hidden" name="action" value="stock_usage">
@@ -452,7 +466,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
         
         <!-- Search and Filters -->
         <form method="GET" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
-            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 1rem; align-items: end;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto auto; gap: 1rem; align-items: end;">
                 <div class="form-group" style="margin-bottom: 0;">
                     <label>Search by Item Name</label>
                     <input type="text" name="search" class="form-control" placeholder="Search items..." value="<?php echo htmlspecialchars($search); ?>">
@@ -483,6 +497,17 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                     </select>
                 </div>
                 
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Rows per page</label>
+                    <select name="rows_per_page" class="form-control" onchange="this.form.submit()">
+                        <option value="10" <?php echo (!isset($_GET['rows_per_page']) || $_GET['rows_per_page'] == 10) ? 'selected' : ''; ?>>10</option>
+                        <option value="25" <?php echo (isset($_GET['rows_per_page']) && $_GET['rows_per_page'] == 25) ? 'selected' : ''; ?>>25</option>
+                        <option value="50" <?php echo (isset($_GET['rows_per_page']) && $_GET['rows_per_page'] == 50) ? 'selected' : ''; ?>>50</option>
+                        <option value="100" <?php echo (isset($_GET['rows_per_page']) && $_GET['rows_per_page'] == 100) ? 'selected' : ''; ?>>100</option>
+                        <option value="all" <?php echo (isset($_GET['rows_per_page']) && $_GET['rows_per_page'] == 'all') ? 'selected' : ''; ?>>All</option>
+                    </select>
+                </div>
+                
                 <div style="display: flex; gap: 0.5rem;">
                     <button type="submit" class="btn btn-primary">Apply</button>
                     <?php if ($search || $filter_section || $filter_status): ?>
@@ -492,7 +517,31 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
             </div>
         </form>
         
+        <?php 
+        // Pagination logic
+        $rows_per_page = isset($_GET['rows_per_page']) ? $_GET['rows_per_page'] : 10;
+        $current_page = isset($_GET['page']) ? intval($_GET['page']) : 1;
+        
+        $total_items = count($filtered_inventory);
+        
+        if ($rows_per_page == 'all') {
+            $paginated_inventory = $filtered_inventory;
+            $total_pages = 1;
+        } else {
+            $rows_per_page = intval($rows_per_page);
+            $total_pages = ceil($total_items / $rows_per_page);
+            $offset = ($current_page - 1) * $rows_per_page;
+            $paginated_inventory = array_slice($filtered_inventory, $offset, $rows_per_page);
+        }
+        ?>
+        
         <?php if (count($filtered_inventory) > 0): ?>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <div>
+                    <strong>Showing <?php echo count($paginated_inventory); ?> of <?php echo $total_items; ?> items</strong>
+                </div>
+            </div>
+            
             <table class="table">
                 <thead>
                     <tr>
@@ -507,7 +556,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach($filtered_inventory as $item): 
+                    <?php foreach($paginated_inventory as $item): 
                         $stock = $item['current_stock'];
                         $reorder = $item['reorder_level'];
                         $status = $item['stock_status'];
@@ -538,6 +587,24 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                     <?php endforeach; ?>
                 </tbody>
             </table>
+            
+            <?php if ($rows_per_page != 'all' && $total_pages > 1): ?>
+            <div style="display: flex; justify-content: center; align-items: center; gap: 0.5rem; margin-top: 1.5rem;">
+                <?php if ($current_page > 1): ?>
+                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => 1])); ?>" class="btn btn-sm btn-secondary">First</a>
+                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $current_page - 1])); ?>" class="btn btn-sm btn-secondary">Previous</a>
+                <?php endif; ?>
+                
+                <span style="padding: 0 1rem;">
+                    Page <strong><?php echo $current_page; ?></strong> of <strong><?php echo $total_pages; ?></strong>
+                </span>
+                
+                <?php if ($current_page < $total_pages): ?>
+                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $current_page + 1])); ?>" class="btn btn-sm btn-secondary">Next</a>
+                    <a href="?<?php echo http_build_query(array_merge($_GET, ['page' => $total_pages])); ?>" class="btn btn-sm btn-secondary">Last</a>
+                <?php endif; ?>
+            </div>
+            <?php endif; ?>
         <?php else: ?>
             <p>No inventory data found.</p>
         <?php endif; ?>
@@ -590,6 +657,55 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
 </div>
 
 <script>
+// Tab switching functionality
+function switchTab(tabId) {
+    // Hide all tab contents
+    const tabContents = document.querySelectorAll('.tab-content');
+    tabContents.forEach(content => {
+        content.style.display = 'none';
+    });
+    
+    // Remove active class from all tabs
+    const tabBtns = document.querySelectorAll('.tab-btn');
+    tabBtns.forEach(btn => {
+        btn.classList.remove('active');
+        btn.style.borderBottom = '3px solid transparent';
+        btn.style.background = 'transparent';
+        btn.style.color = '#666';
+    });
+    
+    // Show selected tab content
+    document.getElementById(tabId).style.display = 'block';
+    
+    // Add active class to clicked tab
+    event.target.classList.add('active');
+    
+    // Style active tab based on type
+    if (tabId === 'stock-in') {
+        event.target.style.borderBottom = '3px solid #4CAF50';
+        event.target.style.background = '#e8f5e9';
+        event.target.style.color = '#4CAF50';
+    } else if (tabId === 'stock-out') {
+        event.target.style.borderBottom = '3px solid #f44336';
+        event.target.style.background = '#ffebee';
+        event.target.style.color = '#f44336';
+    } else if (tabId === 'stock-usage') {
+        event.target.style.borderBottom = '3px solid #2196F3';
+        event.target.style.background = '#e3f2fd';
+        event.target.style.color = '#2196F3';
+    }
+}
+
+// Initialize first tab on page load
+document.addEventListener('DOMContentLoaded', function() {
+    const firstTab = document.querySelector('.tab-btn.active');
+    if (firstTab) {
+        firstTab.style.borderBottom = '3px solid #4CAF50';
+        firstTab.style.background = '#e8f5e9';
+        firstTab.style.color = '#4CAF50';
+    }
+});
+
 // Confirmation dialogs
 function confirmStockOut() {
     const itemSelect = document.querySelector('#stockOutForm select[name="item_id"]');

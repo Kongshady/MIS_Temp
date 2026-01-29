@@ -8,7 +8,6 @@ $message = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
         if ($_POST['action'] == 'add') {
-            $section_id = $_POST['section_id'];
             $firstname = $_POST['firstname'];
             $middlename = $_POST['middlename'];
             $lastname = $_POST['lastname'];
@@ -18,8 +17,8 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $status_code = 1; // Always set to Active when adding new employee
             $role_id = isset($_POST['role_id']) ? $_POST['role_id'] : null;
             
-            $stmt = $conn->prepare("INSERT INTO employee (section_id, firstname, middlename, lastname, username, password_hash, position, role_id, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)");
-            $stmt->bind_param("issssssii", $section_id, $firstname, $middlename, $lastname, $username, $password_hash, $position, $role_id, $status_code);
+            $stmt = $conn->prepare("INSERT INTO employee (firstname, middlename, lastname, username, password_hash, position, role_id, status_code) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bind_param("ssssssii", $firstname, $middlename, $lastname, $username, $password_hash, $position, $role_id, $status_code);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success">Employee added successfully!</div>';
@@ -68,16 +67,49 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
-// Get all employees (only active ones - status_code = 1)
-$employees = $conn->query("SELECT e.employee_id, e.section_id, e.firstname, e.middlename, e.lastname, 
-                                  e.username, e.position, e.role_id, e.status_code,
-                                  s.label as section_name, st.label as status_label, r.display_name as role_name
-                          FROM employee e 
-                          LEFT JOIN section s ON e.section_id = s.section_id 
-                          LEFT JOIN status_code st ON e.status_code = st.status_code 
-                          LEFT JOIN roles r ON e.role_id = r.role_id
-                          WHERE e.status_code = 1
-                          ORDER BY e.employee_id DESC");
+// Get filter parameters
+$filter_section = isset($_GET['section']) ? $_GET['section'] : '';
+$filter_role = isset($_GET['role']) ? $_GET['role'] : '';
+$filter_status = isset($_GET['status']) ? $_GET['status'] : '1'; // Default to active
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+
+// Build query with filters
+$query = "SELECT e.employee_id, e.section_id, e.firstname, e.middlename, e.lastname, 
+                 e.username, e.position, e.role_id, e.status_code,
+                 s.label as section_name, st.label as status_label, r.display_name as role_name
+          FROM employee e 
+          LEFT JOIN section s ON e.section_id = s.section_id 
+          LEFT JOIN status_code st ON e.status_code = st.status_code 
+          LEFT JOIN roles r ON e.role_id = r.role_id
+          WHERE 1=1";
+
+// Apply filters
+if ($filter_status !== '') {
+    $query .= " AND e.status_code = " . intval($filter_status);
+}
+
+if ($filter_section) {
+    $query .= " AND e.section_id = " . intval($filter_section);
+}
+
+if ($filter_role !== '') {
+    if ($filter_role === 'none') {
+        $query .= " AND e.role_id IS NULL";
+    } else {
+        $query .= " AND e.role_id = " . intval($filter_role);
+    }
+}
+
+if ($search) {
+    $search_term = $conn->real_escape_string($search);
+    $query .= " AND (e.firstname LIKE '%$search_term%' OR e.middlename LIKE '%$search_term%' 
+                OR e.lastname LIKE '%$search_term%' OR e.username LIKE '%$search_term%' 
+                OR e.position LIKE '%$search_term%')";
+}
+
+$query .= " ORDER BY e.employee_id DESC";
+
+$employees = $conn->query($query);
 ?>
 
 <div class="container">
@@ -94,19 +126,6 @@ $employees = $conn->query("SELECT e.employee_id, e.section_id, e.firstname, e.mi
             <h3>Add New Employee</h3>
             
             <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1rem;">
-                <div class="form-group">
-                    <label>Section *</label>
-                    <select name="section_id" class="form-control" required>
-                        <option value="">Select Section</option>
-                        <?php 
-                        $sections = $conn->query("SELECT * FROM section");
-                        while($section = $sections->fetch_assoc()): 
-                        ?>
-                            <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>
-                        <?php endwhile; ?>
-                    </select>
-                </div>
-                
                 <div class="form-group">
                     <label>First Name *</label>
                     <input type="text" name="firstname" class="form-control" required>
@@ -160,6 +179,74 @@ $employees = $conn->query("SELECT e.employee_id, e.section_id, e.firstname, e.mi
         
         <!-- Employees List -->
         <h3>Employees List</h3>
+        
+        <!-- Filter Section -->
+        <form method="GET" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+            <div style="display: grid; grid-template-columns: 2fr 1fr 1fr 1fr auto; gap: 1rem; align-items: end;">
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Search by Name/Username/Position</label>
+                    <input type="text" name="search" class="form-control" placeholder="Search..." value="<?php echo htmlspecialchars($search); ?>">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Filter by Section</label>
+                    <select name="section" class="form-control">
+                        <option value="">All Sections</option>
+                        <?php 
+                        $sections_filter = $conn->query("SELECT * FROM section ORDER BY label");
+                        while($section = $sections_filter->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $section['section_id']; ?>" <?php echo $filter_section == $section['section_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($section['label']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Filter by Role</label>
+                    <select name="role" class="form-control">
+                        <option value="">All Roles</option>
+                        <option value="none" <?php echo $filter_role === 'none' ? 'selected' : ''; ?>>No Role</option>
+                        <?php 
+                        $roles_filter = $conn->query("SELECT * FROM roles WHERE status_code = 1 ORDER BY display_name");
+                        if ($roles_filter) {
+                            while($role = $roles_filter->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $role['role_id']; ?>" <?php echo $filter_role == $role['role_id'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($role['display_name']); ?>
+                            </option>
+                        <?php 
+                            endwhile;
+                        }
+                        ?>
+                    </select>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 0;">
+                    <label>Filter by Status</label>
+                    <select name="status" class="form-control">
+                        <option value="">All Status</option>
+                        <?php 
+                        $status_filter = $conn->query("SELECT * FROM status_code");
+                        while($status = $status_filter->fetch_assoc()): 
+                        ?>
+                            <option value="<?php echo $status['status_code']; ?>" <?php echo $filter_status == $status['status_code'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($status['label']); ?>
+                            </option>
+                        <?php endwhile; ?>
+                    </select>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem;">
+                    <button type="submit" class="btn btn-primary">Apply</button>
+                    <?php if ($search || $filter_section || $filter_role !== '' || $filter_status !== '1'): ?>
+                        <a href="employees.php" class="btn btn-secondary">Clear</a>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </form>
+        
         <?php if ($employees->num_rows > 0): ?>
             <table class="table">
                 <thead>
