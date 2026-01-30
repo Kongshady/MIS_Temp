@@ -89,7 +89,7 @@ $query = "SELECT e.employee_id, e.section_id, e.firstname, e.middlename, e.lastn
           LEFT JOIN section s ON e.section_id = s.section_id 
           LEFT JOIN status_code st ON e.status_code = st.status_code 
           LEFT JOIN roles r ON e.role_id = r.role_id
-          WHERE 1=1";
+          WHERE e.is_deleted = 0";
 
 // Apply filters
 if ($filter_status !== '') {
@@ -169,7 +169,7 @@ $employees = $conn->query($query);
                     <select name="section_id" class="form-control">
                         <option value="">Select Section (Optional)</option>
                         <?php 
-                        $sections_add = $conn->query("SELECT * FROM section ORDER BY label");
+                        $sections_add = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY label");
                         if ($sections_add) {
                             while($section = $sections_add->fetch_assoc()): 
                         ?>
@@ -218,7 +218,7 @@ $employees = $conn->query($query);
                     <select name="section" class="form-control">
                         <option value="">All Sections</option>
                         <?php 
-                        $sections_filter = $conn->query("SELECT * FROM section ORDER BY label");
+                        $sections_filter = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY label");
                         while($section = $sections_filter->fetch_assoc()): 
                         ?>
                             <option value="<?php echo $section['section_id']; ?>" <?php echo $filter_section == $section['section_id'] ? 'selected' : ''; ?>>
@@ -327,10 +327,11 @@ $employees = $conn->query($query);
             <input type="hidden" name="employee_id" id="edit_employee_id">
             
             <div class="form-group">
-                <label>Section *</label>
-                <select name="section_id" id="edit_section_id" class="form-control" required>
+                <label>Section</label>
+                <select name="section_id" id="edit_section_id" class="form-control">
+                    <option value="">-- No Section --</option>
                     <?php 
-                    $sections = $conn->query("SELECT * FROM section");
+                    $sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0");
                     while($section = $sections->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>

@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Get templates
-$templates = $conn->query("SELECT * FROM certificate_template WHERE status = 'active' ORDER BY template_name");
+$templates = $conn->query("SELECT * FROM certificate_template WHERE status = 'active' AND is_deleted = 0 ORDER BY template_name");
 
 // Get certificates
 $certificates = $conn->query("SELECT c.*, ct.template_name, e.firstname, e.lastname, p.firstname as patient_fname, p.lastname as patient_lname, eq.name as equipment_name
@@ -271,7 +271,7 @@ $certificates = $conn->query("SELECT c.*, ct.template_name, e.firstname, e.lastn
                 <select name="equipment_id" class="form-control">
                     <option value="">Select Equipment (if applicable)</option>
                     <?php 
-                    $equipment = $conn->query("SELECT * FROM equipment");
+                    $equipment = $conn->query("SELECT * FROM equipment WHERE is_deleted = 0");
                     while($eq = $equipment->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $eq['equipment_id']; ?>"><?php echo htmlspecialchars($eq['name'] . ' (' . $eq['model'] . ')'); ?></option>
@@ -284,7 +284,7 @@ $certificates = $conn->query("SELECT c.*, ct.template_name, e.firstname, e.lastn
                 <select name="issued_by" class="form-control" required>
                     <option value="">Select Employee</option>
                     <?php 
-                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>
@@ -297,7 +297,7 @@ $certificates = $conn->query("SELECT c.*, ct.template_name, e.firstname, e.lastn
                 <select name="verified_by" class="form-control">
                     <option value="">Select Employee</option>
                     <?php 
-                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>

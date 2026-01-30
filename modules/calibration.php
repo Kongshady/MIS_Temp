@@ -211,7 +211,7 @@ $upcoming_calibrations = $conn->query("SELECT * FROM v_upcoming_calibration");
                 <select name="equipment_id" class="form-control" required>
                     <option value="">Select Equipment</option>
                     <?php 
-                    $equipment = $conn->query("SELECT * FROM equipment WHERE status IN ('operational', 'under_maintenance')");
+                    $equipment = $conn->query("SELECT * FROM equipment WHERE status IN ('operational', 'under_maintenance') AND is_deleted = 0");
                     while($eq = $equipment->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $eq['equipment_id']; ?>"><?php echo htmlspecialchars($eq['name'] . ' (' . $eq['model'] . ')'); ?></option>
@@ -273,7 +273,7 @@ $upcoming_calibrations = $conn->query("SELECT * FROM v_upcoming_calibration");
                 <select name="performed_by" class="form-control" required>
                     <option value="">Select Employee</option>
                     <?php 
-                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>

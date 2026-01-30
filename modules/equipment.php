@@ -50,8 +50,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
         } elseif ($_POST['action'] == 'delete_equipment') {
             $equipment_id = $_POST['equipment_id'];
             $equipment_info = $conn->query("SELECT name, model FROM equipment WHERE equipment_id = $equipment_id")->fetch_assoc();
-            $stmt = $conn->prepare("DELETE FROM equipment WHERE equipment_id=?");
-            $stmt->bind_param("i", $equipment_id);
+            $user_id = get_user_id();
+            $stmt = $conn->prepare("UPDATE equipment SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE equipment_id = ?");
+            $stmt->bind_param("ii", $user_id, $equipment_id);
             
             if ($stmt->execute()) {
                 log_activity($conn, get_user_id(), "Deleted equipment: {$equipment_info['name']} - {$equipment_info['model']} (ID: $equipment_id)", 1);
@@ -149,7 +150,7 @@ $offset_usage = ($page_usage - 1) * $rows_usage;
 $recent_usage = array_slice($usage_items, $offset_usage, $rows_usage);
 
 // Get all equipment
-$equipment_query = "SELECT e.*, s.label as section_name FROM equipment e LEFT JOIN section s ON e.section_id = s.section_id ORDER BY e.equipment_id DESC";
+$equipment_query = "SELECT e.*, s.label as section_name FROM equipment e LEFT JOIN section s ON e.section_id = s.section_id WHERE e.is_deleted = 0 ORDER BY e.equipment_id DESC";
 $all_equipment = $conn->query($equipment_query);
 $equipment_items = [];
 if ($all_equipment) {
@@ -210,7 +211,7 @@ $offset = ($current_page - 1) * $rows_per_page;
 $maintenance_items = array_slice($all_maintenance_items, $offset, $rows_per_page);
 
 // Get sections for filter dropdown
-$sections = $conn->query("SELECT * FROM section ORDER BY label");
+$sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY label");
 ?>
 
 <div class="container">
@@ -683,7 +684,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     <select name="section_id" class="form-control">
                         <option value="">Select Section</option>
                         <?php 
-                        $sections = $conn->query("SELECT * FROM section");
+                        $sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0");
                         while($section = $sections->fetch_assoc()): 
                         ?>
                             <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>
@@ -753,7 +754,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                     <select name="section_id" id="edit_section_id" class="form-control">
                         <option value="">Select Section</option>
                         <?php 
-                        $sections = $conn->query("SELECT * FROM section");
+                        $sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0");
                         while($section = $sections->fetch_assoc()): 
                         ?>
                             <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>

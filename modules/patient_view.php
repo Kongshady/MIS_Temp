@@ -70,7 +70,7 @@ $patient = $conn->query("SELECT p.*, ph.physician_name, s.label as status_label
                         FROM patient p 
                         LEFT JOIN physician ph ON p.physician_id = ph.physician_id
                         LEFT JOIN status_code s ON p.status_code = s.status_code 
-                        WHERE p.patient_id = $patient_id")->fetch_assoc();
+                        WHERE p.patient_id = $patient_id AND p.is_deleted = 0")->fetch_assoc();
 
 if (!$patient) {
     echo '<div class="container"><div class="alert alert-danger">Patient not found!</div></div>';
@@ -205,7 +205,7 @@ $age = date_diff(date_create($patient['birthdate']), date_create('now'))->y;
                 <select name="test_id" class="form-control" required>
                     <option value="">Select Test</option>
                     <?php 
-                    $tests = $conn->query("SELECT * FROM test ORDER BY label");
+                    $tests = $conn->query("SELECT * FROM test WHERE is_deleted = 0 ORDER BY label");
                     while($test = $tests->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $test['test_id']; ?>"><?php echo htmlspecialchars($test['label']); ?></option>
@@ -238,7 +238,7 @@ $age = date_diff(date_create($patient['birthdate']), date_create('now'))->y;
                 <select name="performed_by" class="form-control" required>
                     <option value="">Select Employee</option>
                     <?php 
-                    $employees = $conn->query("SELECT employee_id, firstname, lastname FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT employee_id, firstname, lastname FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>
@@ -295,7 +295,7 @@ $age = date_diff(date_create($patient['birthdate']), date_create('now'))->y;
                 <label>Performed By *</label>
                 <select name="performed_by" id="edit_performed_by" class="form-control" required>
                     <?php 
-                    $employees = $conn->query("SELECT employee_id, firstname, lastname FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT employee_id, firstname, lastname FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>

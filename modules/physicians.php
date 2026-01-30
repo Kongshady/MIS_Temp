@@ -45,8 +45,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         } elseif ($_POST['action'] == 'delete') {
             $physician_id = $_POST['physician_id'];
-            $stmt = $conn->prepare("DELETE FROM physician WHERE physician_id=?");
-            $stmt->bind_param("i", $physician_id);
+            $user_id = get_user_id();
+            $stmt = $conn->prepare("UPDATE physician SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE physician_id = ?");
+            $stmt->bind_param("ii", $user_id, $physician_id);
             
             if ($stmt->execute()) {
                 log_activity($conn, get_user_id(), "Deleted physician ID: $physician_id", 1);
@@ -65,7 +66,7 @@ $specialization_filter = isset($_GET['specialization']) ? $_GET['specialization'
 $rows_per_page = isset($_GET['rows']) && $_GET['rows'] !== 'all' ? (int)$_GET['rows'] : 0;
 
 // Build query with filters
-$query = "SELECT p.*, s.label as status_label FROM physician p LEFT JOIN status_code s ON p.status_code = s.status_code WHERE 1=1";
+$query = "SELECT p.*, s.label as status_label FROM physician p LEFT JOIN status_code s ON p.status_code = s.status_code WHERE p.is_deleted = 0";
 $conditions = [];
 $params = [];
 $types = '';

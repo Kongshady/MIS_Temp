@@ -12,9 +12,9 @@ $item_id = isset($_GET['item_id']) ? $_GET['item_id'] : '';
 $employee_id = isset($_GET['employee_id']) ? $_GET['employee_id'] : '';
 
 // Get sections for filter
-$sections = $conn->query("SELECT * FROM section ORDER BY label");
-$items = $conn->query("SELECT * FROM item ORDER BY label");
-$employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 ORDER BY firstname");
+$sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY label");
+$items = $conn->query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY label");
+$employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0 ORDER BY firstname");
 ?>
 
 <div class="container">
@@ -122,7 +122,7 @@ $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 ORDER BY
         case 'movements':
             $report_title = 'Stock Movement Report';
             $where_clauses = ["datetime_added BETWEEN '$date_from 00:00:00' AND '$date_to 23:59:59'"];
-            if ($section_id) $where_clauses[] = "section_name = (SELECT label FROM section WHERE section_id = $section_id)";
+            if ($section_id) $where_clauses[] = "section_name = (SELECT label FROM section WHERE section_id = $section_id AND is_deleted = 0)";
             if ($item_id) $where_clauses[] = "item_id = $item_id";
             $where_sql = implode(' AND ', $where_clauses);
             

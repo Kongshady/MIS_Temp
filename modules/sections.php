@@ -32,8 +32,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         } elseif ($_POST['action'] == 'delete') {
             $section_id = $_POST['section_id'];
-            $stmt = $conn->prepare("DELETE FROM section WHERE section_id=?");
-            $stmt->bind_param("i", $section_id);
+            $user_id = get_user_id();
+            $stmt = $conn->prepare("UPDATE section SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE section_id = ?");
+            $stmt->bind_param("ii", $user_id, $section_id);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success">Section deleted successfully!</div>';
@@ -45,7 +46,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Get all sections
-$sections = $conn->query("SELECT * FROM section ORDER BY section_id DESC");
+$sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY section_id DESC");
 ?>
 
 <div class="container">

@@ -1,9 +1,8 @@
 <?php
 require_once '../db_connection.php';
-$page_title = 'Inventory Management';
-include '../includes/header.php';
+require_once '../includes/auth.php';
 
-// Handle form submissions
+// Handle form submissions BEFORE including header
 $message = '';
 if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     if (isset($_POST['action'])) {
@@ -43,10 +42,12 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             if ($success_count > 0) {
                 $items_list = implode(', ', $added_items);
                 log_activity($conn, get_user_id(), "Added stock (bulk): $items_list", 1);
-                $message = '<div class="alert alert-success">Successfully added ' . $success_count . ' item(s) to stock!</div>';
+                $_SESSION['success_message'] = 'Successfully added ' . $success_count . ' item(s) to stock!';
                 if ($error_count > 0) {
-                    $message .= '<div class="alert alert-warning">' . $error_count . ' item(s) failed to add.</div>';
+                    $_SESSION['warning_message'] = $error_count . ' item(s) failed to add.';
                 }
+                header('Location: inventory.php');
+                exit();
             } else {
                 $message = '<div class="alert alert-danger">Error adding stock items.</div>';
             }
@@ -171,6 +172,10 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
     }
 }
 
+// Now include header after POST processing
+$page_title = 'Inventory Management';
+include '../includes/header.php';
+
 // Get low stock alerts
 $low_stock_alerts = $conn->query("SELECT * FROM v_current_stock WHERE stock_status IN ('out_of_stock', 'low_stock') ORDER BY current_stock");
 
@@ -185,7 +190,8 @@ $stats_query = "SELECT
          AND (COALESCE(si.total_in, 0) - COALESCE(so.total_out, 0)) <= i.reorder_level THEN 1 ELSE 0 END) as low_stock_count
 FROM item i
 LEFT JOIN (SELECT item_id, SUM(quantity) as total_in FROM stock_in GROUP BY item_id) si ON i.item_id = si.item_id
-LEFT JOIN (SELECT item_id, SUM(quantity) as total_out FROM stock_out GROUP BY item_id) so ON i.item_id = so.item_id";
+LEFT JOIN (SELECT item_id, SUM(quantity) as total_out FROM stock_out GROUP BY item_id) so ON i.item_id = so.item_id
+WHERE i.is_deleted = 0";
 $stats = $conn->query($stats_query)->fetch_assoc();
 
 // Get today's statistics
@@ -196,7 +202,7 @@ $today_stats = [
     'low_stock_today' => $conn->query("SELECT COUNT(DISTINCT i.item_id) as count FROM item i 
         LEFT JOIN (SELECT item_id, SUM(quantity) as total_in FROM stock_in GROUP BY item_id) si ON i.item_id = si.item_id
         LEFT JOIN (SELECT item_id, SUM(quantity) as total_out FROM stock_out GROUP BY item_id) so ON i.item_id = so.item_id
-        WHERE (COALESCE(si.total_in, 0) - COALESCE(so.total_out, 0)) > 0 
+        WHERE i.is_deleted = 0 AND (COALESCE(si.total_in, 0) - COALESCE(so.total_out, 0)) > 0 
         AND (COALESCE(si.total_in, 0) - COALESCE(so.total_out, 0)) <= i.reorder_level")->fetch_assoc()['count'],
     'expiring_today' => $conn->query("SELECT COUNT(*) as count FROM stock_in WHERE DATE(expiry_date) = '$today'")->fetch_assoc()['count']
 ];
@@ -215,10 +221,10 @@ $inventory_query = "SELECT i.item_id, i.label, i.unit, i.reorder_level,
                    COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as current_stock,
                    s.label as section_name
                    FROM item i
-                   LEFT JOIN stock_in si ON i.item_id = si.item_id
+                   INNER JOIN stock_in si ON i.item_id = si.item_id
                    LEFT JOIN stock_out so ON i.item_id = so.item_id
                    LEFT JOIN section s ON i.section_id = s.section_id
-                   WHERE 1=1";
+                   WHERE i.is_deleted = 0";
 
 if ($search) {
     $inventory_query .= " AND i.label LIKE '%" . $conn->real_escape_string($search) . "%'";
@@ -269,7 +275,18 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
 ?>
 
 <div class="container">
-    <?php echo $message; ?>
+    <?php 
+    // Display session messages
+    if (isset($_SESSION['success_message'])) {
+        echo '<div class="alert alert-success">' . $_SESSION['success_message'] . '</div>';
+        unset($_SESSION['success_message']);
+    }
+    if (isset($_SESSION['warning_message'])) {
+        echo '<div class="alert alert-warning">' . $_SESSION['warning_message'] . '</div>';
+        unset($_SESSION['warning_message']);
+    }
+    echo $message; 
+    ?>
     
     <div class="card">
         <div class="card-header">
@@ -423,39 +440,37 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
     
     <div class="card">
         <div class="card-header">
-            <h2><i class="fas fa-clipboard-list"></i> Stock Management</h2>
-        </div>
-        
-        <!-- Tab Navigation -->
-        <div class="tab-navigation" style="display: flex; border-bottom: 2px solid #e0e0e0; margin-bottom: 0; background: #f5f5f5;">
-            <button class="tab-btn active" onclick="switchTab('stock-in')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
-                ➕ Stock In
-            </button>
-            <button class="tab-btn" onclick="switchTab('stock-out')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
-                ➖ Stock Out
-            </button>
-            <button class="tab-btn" onclick="switchTab('stock-usage')" style="flex: 1; padding: 1rem; border: none; background: transparent; cursor: pointer; font-weight: bold; border-bottom: 3px solid transparent; transition: all 0.3s;">
-                <i class="fas fa-minus-circle"></i> Stock Usage
-            </button>
+            <div style="display: flex; justify-content: space-between; align-items: end; border-bottom: 2px solid #dee2e6;">
+                <div style="display: flex; gap: 0;">
+                    <button class="tab-btn active" onclick="switchTab('stock-in')" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid #48bb78; color: #48bb78; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        <i class="fas fa-plus-circle"></i> Stock In
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('stock-out')" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid transparent; color: #666; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        <i class="fas fa-minus-circle"></i> Stock Out
+                    </button>
+                    <button class="tab-btn" onclick="switchTab('stock-usage')" style="padding: 0.75rem 1.5rem; background: none; border: none; border-bottom: 3px solid transparent; color: #666; font-weight: 600; cursor: pointer; transition: all 0.3s;">
+                        <i class="fas fa-clipboard-list"></i> Stock Usage
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- Tab Content -->
-        <div style="padding: 1.5rem;">
+        <div style="padding: 2rem;">
             <!-- Stock In Form -->
-            <div id="stock-in" class="tab-content" style="display: block; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; background: white;">
-                <h3 style="color: #333; margin-bottom: 1.5rem; border-bottom: 2px solid #667eea; padding-bottom: 0.5rem;"><i class="fas fa-plus-circle"></i> Stock In</h3>
+            <div id="stock-in" class="tab-content" style="display: block;">
                 <form method="POST" id="stockInForm">
                     <input type="hidden" name="action" value="stock_in">
                     
                     <div id="stockInItems">
-                        <div class="stock-item-row" style="position: relative; margin-bottom: 1rem;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
-                                <div class="form-group">
-                                    <label>Item *</label>
+                        <div class="stock-item-row" style="margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Item *</label>
                                     <select name="item_id[]" class="form-control" required>
                                         <option value="">Select Item</option>
                                         <?php 
-                                        $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                        $items = $conn->query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY label");
                                         while($item = $items->fetch_assoc()): 
                                         ?>
                                             <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
@@ -463,13 +478,13 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                                     </select>
                                 </div>
                                 
-                                <div class="form-group">
-                                    <label>Quantity *</label>
-                                    <input type="number" name="quantity[]" class="form-control" required min="1">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Quantity *</label>
+                                    <input type="number" name="quantity[]" class="form-control" required min="1" placeholder="0">
                                 </div>
                                 
-                                <div class="form-group" style="margin-top: 1.7rem;">
-                                    <button type="button" class="btn btn-success btn-sm" onclick="addStockInRow()" title="Add another item">
+                                <div>
+                                    <button type="button" class="btn btn-success" onclick="addStockInRow()" title="Add another item" style="padding: 0.5rem 1rem;">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
@@ -477,64 +492,71 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="form-group">
-                            <label>Supplier</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Supplier</label>
                             <input type="text" name="supplier" class="form-control" placeholder="Supplier name">
                         </div>
                         
                         <div class="form-group">
-                            <label>Reference No.</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Reference No.</label>
                             <input type="text" name="reference_number" class="form-control" placeholder="Invoice/PO/DR number">
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="form-group">
-                            <label>Expiry Date</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Expiry Date</label>
                             <input type="date" name="expiry_date" class="form-control">
                         </div>
                         
                         <div class="form-group">
-                            <label>Remarks</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Remarks</label>
                             <input type="text" name="remarks" class="form-control" placeholder="Optional notes">
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-success" style="width: 100%; margin-top: 0.5rem;"><i class="fas fa-check"></i> Add Stock</button>
+                    <button type="submit" class="btn btn-success" style="width: 100%; padding: 0.75rem; font-weight: 600;"><i class="fas fa-check"></i> Add Stock</button>
                 </form>
             </div>
             
             <!-- Stock Out Form -->
-            <div id="stock-out" class="tab-content" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; background: white;">
-                <h3 style="color: #333; margin-bottom: 1.5rem; border-bottom: 2px solid #f5576c; padding-bottom: 0.5rem;"><i class="fas fa-minus-circle"></i> Stock Out</h3>
+            <div id="stock-out" class="tab-content" style="display: none;">
                 <form method="POST" id="stockOutForm" onsubmit="return confirmStockOut()">
                     <input type="hidden" name="action" value="stock_out">
                     
                     <div id="stockOutItems">
-                        <div class="stock-item-row" style="position: relative; margin-bottom: 1rem;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
-                                <div class="form-group">
-                                    <label>Item *</label>
-                                    <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
+                        <div class="stock-item-row" style="margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Item *</label>
+                                    <select name="item_id[]" class="form-control" required onchange="handleItemChange(this, 'stockOutItems')">
                                         <option value="">Select Item</option>
                                         <?php 
-                                        $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                        $items = $conn->query("SELECT i.*, 
+                                                              COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as available_stock
+                                                              FROM item i
+                                                              LEFT JOIN stock_in si ON i.item_id = si.item_id
+                                                              LEFT JOIN stock_out so ON i.item_id = so.item_id
+                                                              WHERE i.status_code = 1
+                                                              GROUP BY i.item_id
+                                                              HAVING available_stock > 0
+                                                              ORDER BY i.label");
                                         while($item = $items->fetch_assoc()): 
                                         ?>
-                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?> (Stock: <?php echo $item['available_stock']; ?>)</option>
                                         <?php endwhile; ?>
                                     </select>
                                 </div>
                                 
-                                <div class="form-group">
-                                    <label>Quantity *</label>
-                                    <input type="number" name="quantity[]" class="form-control" required min="1">
-                                    <small class="stock-available" style="color: #666;"></small>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Quantity *</label>
+                                    <input type="number" name="quantity[]" class="form-control" required min="1" placeholder="0">
+                                    <small class="stock-available" style="color: #48bb78; font-size: 0.75rem; display: block; margin-top: 0.25rem;"></small>
                                 </div>
                                 
-                                <div class="form-group" style="margin-top: 1.7rem;">
-                                    <button type="button" class="btn btn-success btn-sm" onclick="addStockOutRow()" title="Add another item">
+                                <div>
+                                    <button type="button" class="btn btn-success" onclick="addStockOutRow()" title="Add another item" style="padding: 0.5rem 1rem;">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
@@ -542,52 +564,59 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="form-group">
-                            <label>Reference No.</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Reference No.</label>
                             <input type="text" name="reference_number" class="form-control" placeholder="Requisition number">
                         </div>
                         
                         <div class="form-group">
-                            <label>Remarks *</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Remarks *</label>
                             <input type="text" name="remarks" class="form-control" required placeholder="Reason for removal">
                         </div>
                     </div>
                     
-                    <button type="submit" class="btn btn-danger" style="width: 100%; margin-top: 0.5rem;"><i class="fas fa-check"></i> Remove Stock</button>
+                    <button type="submit" class="btn btn-danger" style="width: 100%; padding: 0.75rem; font-weight: 600;"><i class="fas fa-check"></i> Remove Stock</button>
                 </form>
             </div>
             
             <!-- Stock Usage Form -->
-            <div id="stock-usage" class="tab-content" style="display: none; border: 1px solid #e0e0e0; border-radius: 8px; padding: 2rem; background: white;">
-                <h3 style="color: #333; margin-bottom: 1.5rem; border-bottom: 2px solid #764ba2; padding-bottom: 0.5rem;"><i class="fas fa-clipboard-list"></i> Record Usage</h3>
+            <div id="stock-usage" class="tab-content" style="display: none;">
                 <form method="POST" id="usageForm" onsubmit="return confirmUsage()">
                     <input type="hidden" name="action" value="stock_usage">
                     
                     <div id="stockUsageItems">
-                        <div class="stock-item-row" style="position: relative; margin-bottom: 1rem;">
-                            <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
-                                <div class="form-group">
-                                    <label>Item *</label>
-                                    <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
+                        <div class="stock-item-row" style="margin-bottom: 1rem;">
+                            <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Item *</label>
+                                    <select name="item_id[]" class="form-control" required onchange="handleItemChange(this, 'stockUsageItems')">
                                         <option value="">Select Item</option>
                                         <?php 
-                                        $items = $conn->query("SELECT * FROM item ORDER BY label");
+                                        $items = $conn->query("SELECT i.*, 
+                                                              COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as available_stock
+                                                              FROM item i
+                                                              LEFT JOIN stock_in si ON i.item_id = si.item_id
+                                                              LEFT JOIN stock_out so ON i.item_id = so.item_id
+                                                              WHERE i.status_code = 1
+                                                              GROUP BY i.item_id
+                                                              HAVING available_stock > 0
+                                                              ORDER BY i.label");
                                         while($item = $items->fetch_assoc()): 
                                         ?>
-                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
+                                            <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?> (Stock: <?php echo $item['available_stock']; ?>)</option>
                                         <?php endwhile; ?>
                                     </select>
                                 </div>
                                 
-                                <div class="form-group">
-                                    <label>Quantity *</label>
-                                    <input type="number" name="quantity[]" class="form-control" required min="1" value="1">
-                                    <small class="stock-available" style="color: #666;"></small>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Quantity *</label>
+                                    <input type="number" name="quantity[]" class="form-control" required min="1" value="1" placeholder="0">
+                                    <small class="stock-available" style="color: #48bb78; font-size: 0.75rem; display: block; margin-top: 0.25rem;"></small>
                                 </div>
                                 
-                                <div class="form-group" style="margin-top: 1.7rem;">
-                                    <button type="button" class="btn btn-success btn-sm" onclick="addStockUsageRow()" title="Add another item">
+                                <div>
+                                    <button type="button" class="btn btn-success" onclick="addStockUsageRow()" title="Add another item" style="padding: 0.5rem 1rem;">
                                         <i class="fas fa-plus"></i>
                                     </button>
                                 </div>
@@ -595,13 +624,13 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="form-group">
-                            <label>Employee *</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Employee *</label>
                             <select name="employee_id" class="form-control" required>
                                 <option value="">Select Employee</option>
                                 <?php 
-                                $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                                $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0");
                                 while($emp = $employees->fetch_assoc()): 
                                 ?>
                                     <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>
@@ -610,32 +639,36 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                         </div>
                         
                         <div class="form-group">
-                            <label>Purpose *</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Purpose *</label>
                             <input type="text" name="purpose" class="form-control" required placeholder="Purpose of use">
                         </div>
                     </div>
                     
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; margin-bottom: 1.5rem;">
                         <div class="form-group">
-                            <label>OR Number</label>
+                            <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">OR Number</label>
                             <input type="text" name="or_number" class="form-control" placeholder="Official receipt number">
                         </div>
                         <div></div>
                     </div>
                     
-                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 0.5rem;"><i class="fas fa-check"></i> Record Usage</button>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; padding: 0.75rem; font-weight: 600;"><i class="fas fa-check"></i> Record Usage</button>
                 </form>
             </div>
         </div>
+    </div>
         
-        <!-- Current Inventory -->
-        <h3>Current Inventory Levels</h3>
+    <!-- Current Inventory -->
+    <div class="card" style="margin-top: 2rem;">
+        <div class="card-header">
+            <h2><i class="fas fa-boxes"></i> Current Inventory Levels</h2>
+        </div>
         
         <!-- Search and Filters -->
-        <form method="GET" style="background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 1.5rem;">
+        <form method="GET" style="background: #f8f9fa; padding: 1.5rem; border-radius: 8px; margin-bottom: 1.5rem;">
             <div style="display: grid; grid-template-columns: 2fr 1fr 1fr auto auto; gap: 1rem; align-items: end;">
                 <div class="form-group" style="margin-bottom: 0;">
-                    <label>Search by Item Name</label>
+                    <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Search by Item Name</label>
                     <input type="text" name="search" class="form-control" placeholder="Search items..." value="<?php echo htmlspecialchars($search); ?>">
                 </div>
                 
@@ -644,7 +677,7 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
                     <select name="section" class="form-control">
                         <option value="">All Sections</option>
                         <?php 
-                        $sections_filter = $conn->query("SELECT * FROM section ORDER BY label");
+                        $sections_filter = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY label");
                         while($section = $sections_filter->fetch_assoc()): 
                         ?>
                             <option value="<?php echo $section['section_id']; ?>" <?php echo $filter_section == $section['section_id'] ? 'selected' : ''; ?>>
@@ -824,6 +857,98 @@ $recent_movements = $conn->query("SELECT * FROM v_stock_movements ORDER BY datet
 </div>
 
 <script>
+// Store all available items for stock out and usage forms
+const availableStockOutItems = [
+    <?php 
+    $items_js = $conn->query("SELECT i.*, 
+                              COALESCE(SUM(si.quantity), 0) - COALESCE(SUM(so.quantity), 0) as available_stock
+                              FROM item i
+                              LEFT JOIN stock_in si ON i.item_id = si.item_id
+                              LEFT JOIN stock_out so ON i.item_id = so.item_id
+                              WHERE i.status_code = 1
+                              GROUP BY i.item_id
+                              HAVING available_stock > 0
+                              ORDER BY i.label");
+    $items_array = [];
+    while($item = $items_js->fetch_assoc()) {
+        $items_array[] = "{id: " . $item['item_id'] . ", label: '" . addslashes(htmlspecialchars($item['label'])) . "', stock: " . $item['available_stock'] . "}";
+    }
+    echo implode(",\n    ", $items_array);
+    ?>
+];
+
+const allItems = [
+    <?php 
+    $items_all = $conn->query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY label");
+    $items_array_all = [];
+    while($item = $items_all->fetch_assoc()) {
+        $items_array_all[] = "{id: " . $item['item_id'] . ", label: '" . addslashes(htmlspecialchars($item['label'])) . "'}";
+    }
+    echo implode(",\n    ", $items_array_all);
+    ?>
+];
+
+// Get selected items in a container
+function getSelectedItems(containerId) {
+    const container = document.getElementById(containerId);
+    const selects = container.querySelectorAll('select[name="item_id[]"]');
+    const selectedIds = [];
+    selects.forEach(select => {
+        if (select.value) {
+            selectedIds.push(parseInt(select.value));
+        }
+    });
+    return selectedIds;
+}
+
+// Update all dropdowns in a container to hide selected items
+function updateDropdownOptions(containerId, itemsList) {
+    const container = document.getElementById(containerId);
+    if (!container) return;
+    
+    const selects = container.querySelectorAll('select[name="item_id[]"]');
+    const selectedItems = getSelectedItems(containerId);
+    
+    selects.forEach(select => {
+        const currentValue = select.value;
+        
+        // If this select doesn't have options yet (newly added), build them
+        if (select.options.length <= 1) {
+            const availableItems = itemsList.filter(item => 
+                !selectedItems.includes(item.id) || item.id == currentValue
+            );
+            
+            // Rebuild options
+            select.innerHTML = '<option value="">Select Item</option>';
+            availableItems.forEach(item => {
+                const option = document.createElement('option');
+                option.value = item.id;
+                option.textContent = item.stock !== undefined 
+                    ? `${item.label} (Stock: ${item.stock})` 
+                    : item.label;
+                if (item.id == currentValue) {
+                    option.selected = true;
+                }
+                select.appendChild(option);
+            });
+        } else {
+            // Just hide/show existing options based on selections
+            Array.from(select.options).forEach(option => {
+                if (option.value === '') return; // Skip the "Select Item" option
+                
+                const itemId = parseInt(option.value);
+                if (selectedItems.includes(itemId) && itemId != currentValue) {
+                    option.style.display = 'none';
+                    option.disabled = true;
+                } else {
+                    option.style.display = '';
+                    option.disabled = false;
+                }
+            });
+        }
+    });
+}
+
 // Tab switching functionality
 function switchTab(tabId) {
     // Hide all tab contents
@@ -835,31 +960,24 @@ function switchTab(tabId) {
     // Remove active class from all tabs
     const tabBtns = document.querySelectorAll('.tab-btn');
     tabBtns.forEach(btn => {
-        btn.classList.remove('active');
-        btn.style.borderBottom = '3px solid transparent';
-        btn.style.background = 'transparent';
+        btn.style.borderBottomColor = 'transparent';
         btn.style.color = '#666';
     });
     
     // Show selected tab content
     document.getElementById(tabId).style.display = 'block';
     
-    // Add active class to clicked tab
-    event.target.classList.add('active');
-    
     // Style active tab based on type
+    const activeBtn = event.target.closest('.tab-btn');
     if (tabId === 'stock-in') {
-        event.target.style.borderBottom = '3px solid #4CAF50';
-        event.target.style.background = '#e8f5e9';
-        event.target.style.color = '#4CAF50';
+        activeBtn.style.borderBottomColor = '#48bb78';
+        activeBtn.style.color = '#48bb78';
     } else if (tabId === 'stock-out') {
-        event.target.style.borderBottom = '3px solid #f44336';
-        event.target.style.background = '#ffebee';
-        event.target.style.color = '#f44336';
+        activeBtn.style.borderBottomColor = '#f56565';
+        activeBtn.style.color = '#f56565';
     } else if (tabId === 'stock-usage') {
-        event.target.style.borderBottom = '3px solid #2196F3';
-        event.target.style.background = '#e3f2fd';
-        event.target.style.color = '#2196F3';
+        activeBtn.style.borderBottomColor = '#4299e1';
+        activeBtn.style.color = '#4299e1';
     }
 }
 
@@ -950,16 +1068,16 @@ function addStockInRow() {
     
     const newRow = document.createElement('div');
     newRow.className = 'stock-item-row';
-    newRow.style.cssText = 'position: relative; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px dashed #ddd;';
+    newRow.style.cssText = 'margin-bottom: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;';
     
     newRow.innerHTML = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
-            <div class="form-group">
-                <label>Item *</label>
+        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Item *</label>
                 <select name="item_id[]" class="form-control" required>
                     <option value="">Select Item</option>
                     <?php 
-                    $items = $conn->query("SELECT * FROM item ORDER BY label");
+                    $items = $conn->query("SELECT * FROM item WHERE is_deleted = 0 ORDER BY label");
                     while($item = $items->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
@@ -967,13 +1085,13 @@ function addStockInRow() {
                 </select>
             </div>
             
-            <div class="form-group">
-                <label>Quantity *</label>
-                <input type="number" name="quantity[]" class="form-control" required min="1">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Quantity *</label>
+                <input type="number" name="quantity[]" class="form-control" required min="1" placeholder="0">
             </div>
             
-            <div class="form-group" style="margin-top: 1.7rem;">
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)" title="Remove this item">
+            <div>
+                <button type="button" class="btn btn-danger" onclick="removeStockRow(this)" title="Remove this item" style="padding: 0.5rem 1rem;">
                     <i class="fas fa-minus"></i>
                 </button>
             </div>
@@ -986,35 +1104,35 @@ function addStockInRow() {
 // Add new Stock Out row
 function addStockOutRow() {
     const container = document.getElementById('stockOutItems');
-    const rowCount = container.querySelectorAll('.stock-item-row').length;
+    const selectedItems = getSelectedItems('stockOutItems');
+    const availableItems = availableStockOutItems.filter(item => !selectedItems.includes(item.id));
     
     const newRow = document.createElement('div');
     newRow.className = 'stock-item-row';
-    newRow.style.cssText = 'position: relative; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px dashed #ddd;';
+    newRow.style.cssText = 'margin-bottom: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;';
+    
+    let optionsHtml = '<option value="">Select Item</option>';
+    availableItems.forEach(item => {
+        optionsHtml += `<option value="${item.id}">${item.label} (Stock: ${item.stock})</option>`;
+    });
     
     newRow.innerHTML = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
-            <div class="form-group">
-                <label>Item *</label>
-                <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
-                    <option value="">Select Item</option>
-                    <?php 
-                    $items = $conn->query("SELECT * FROM item ORDER BY label");
-                    while($item = $items->fetch_assoc()): 
-                    ?>
-                        <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                    <?php endwhile; ?>
+        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Item *</label>
+                <select name="item_id[]" class="form-control" required onchange="handleItemChange(this, 'stockOutItems')">
+                    ${optionsHtml}
                 </select>
             </div>
             
-            <div class="form-group">
-                <label>Quantity *</label>
-                <input type="number" name="quantity[]" class="form-control" required min="1">
-                <small class="stock-available" style="color: #666;"></small>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Quantity *</label>
+                <input type="number" name="quantity[]" class="form-control" required min="1" placeholder="0">
+                <small class="stock-available" style="color: #48bb78; font-size: 0.75rem; display: block; margin-top: 0.25rem;"></small>
             </div>
             
-            <div class="form-group" style="margin-top: 1.7rem;">
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)" title="Remove this item">
+            <div>
+                <button type="button" class="btn btn-danger" onclick="removeStockRow(this, 'stockOutItems')" title="Remove this item" style="padding: 0.5rem 1rem;">
                     <i class="fas fa-minus"></i>
                 </button>
             </div>
@@ -1025,13 +1143,19 @@ function addStockOutRow() {
 }
 
 // Remove a stock row
-function removeStockRow(button) {
+function removeStockRow(button, containerId) {
     const row = button.closest('.stock-item-row');
     const container = row.parentElement;
     
     // Don't remove if it's the only row
     if (container.querySelectorAll('.stock-item-row').length > 1) {
         row.remove();
+        // Update dropdowns after removal
+        if (containerId === 'stockOutItems' || containerId === 'stockUsageItems') {
+            updateDropdownOptions(containerId, availableStockOutItems);
+        } else if (containerId === 'stockInItems') {
+            updateDropdownOptions(containerId, allItems);
+        }
     } else {
         alert('At least one item is required.');
     }
@@ -1040,35 +1164,35 @@ function removeStockRow(button) {
 // Add new Stock Usage row
 function addStockUsageRow() {
     const container = document.getElementById('stockUsageItems');
-    const rowCount = container.querySelectorAll('.stock-item-row').length;
+    const selectedItems = getSelectedItems('stockUsageItems');
+    const availableItems = availableStockOutItems.filter(item => !selectedItems.includes(item.id));
     
     const newRow = document.createElement('div');
     newRow.className = 'stock-item-row';
-    newRow.style.cssText = 'position: relative; margin-bottom: 1rem; padding-top: 1rem; border-top: 1px dashed #ddd;';
+    newRow.style.cssText = 'margin-bottom: 1rem; padding-top: 1rem; border-top: 1px solid #e0e0e0;';
+    
+    let optionsHtml = '<option value="">Select Item</option>';
+    availableItems.forEach(item => {
+        optionsHtml += `<option value="${item.id}">${item.label} (Stock: ${item.stock})</option>`;
+    });
     
     newRow.innerHTML = `
-        <div style="display: grid; grid-template-columns: 1fr 1fr auto; gap: 1rem; align-items: start;">
-            <div class="form-group">
-                <label>Item *</label>
-                <select name="item_id[]" class="form-control" required onchange="checkStockForRow(this)">
-                    <option value="">Select Item</option>
-                    <?php 
-                    $items = $conn->query("SELECT * FROM item ORDER BY label");
-                    while($item = $items->fetch_assoc()): 
-                    ?>
-                        <option value="<?php echo $item['item_id']; ?>"><?php echo htmlspecialchars($item['label']); ?></option>
-                    <?php endwhile; ?>
+        <div style="display: grid; grid-template-columns: 2fr 1fr auto; gap: 1rem; align-items: end;">
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Item *</label>
+                <select name="item_id[]" class="form-control" required onchange="handleItemChange(this, 'stockUsageItems')">
+                    ${optionsHtml}
                 </select>
             </div>
             
-            <div class="form-group">
-                <label>Quantity *</label>
-                <input type="number" name="quantity[]" class="form-control" required min="1" value="1">
-                <small class="stock-available" style="color: #666;"></small>
+            <div class="form-group" style="margin-bottom: 0;">
+                <label style="font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; display: block;">Quantity *</label>
+                <input type="number" name="quantity[]" class="form-control" required min="1" value="1" placeholder="0">
+                <small class="stock-available" style="color: #48bb78; font-size: 0.75rem; display: block; margin-top: 0.25rem;"></small>
             </div>
             
-            <div class="form-group" style="margin-top: 1.7rem;">
-                <button type="button" class="btn btn-danger btn-sm" onclick="removeStockRow(this)" title="Remove this item">
+            <div>
+                <button type="button" class="btn btn-danger" onclick="removeStockRow(this, 'stockUsageItems')" title="Remove this item" style="padding: 0.5rem 1rem;">
                     <i class="fas fa-minus"></i>
                 </button>
             </div>
@@ -1076,6 +1200,17 @@ function addStockUsageRow() {
     `;
     
     container.appendChild(newRow);
+}
+
+// Handle item selection change
+function handleItemChange(selectElement, containerId) {
+    // Update all dropdowns to hide/show items based on current selections
+    if (containerId === 'stockOutItems' || containerId === 'stockUsageItems') {
+        updateDropdownOptions(containerId, availableStockOutItems);
+    }
+    
+    // Also check stock for the selected item
+    checkStockForRow(selectElement);
 }
 
 // Check stock for specific row in Stock Out and Stock Usage

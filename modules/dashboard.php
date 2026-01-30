@@ -63,11 +63,11 @@ $user_role = get_user_role();
         <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
             <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Patients</div>
             <?php
-            $patient_count = $conn->query("SELECT COUNT(*) as count FROM patient WHERE status_code = 1")->fetch_assoc()['count'];
+            $patient_count = $conn->query("SELECT COUNT(*) as count FROM patient WHERE status_code = 1 AND is_deleted = 0")->fetch_assoc()['count'];
             // Check if datetime_added column exists in patient table
             $patient_cols = $conn->query("SHOW COLUMNS FROM patient LIKE 'datetime_added'");
             $patient_today = ($patient_cols && $patient_cols->num_rows > 0) ? 
-                $conn->query("SELECT COUNT(*) as count FROM patient WHERE status_code = 1 AND DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
+                $conn->query("SELECT COUNT(*) as count FROM patient WHERE status_code = 1 AND is_deleted = 0 AND DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
             ?>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #4a5568;"><?php echo $patient_count; ?></div>
@@ -86,7 +86,7 @@ $user_role = get_user_role();
         <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
             <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Inventory</div>
             <?php
-            $item_count = $conn->query("SELECT COUNT(*) as count FROM item WHERE status_code = 1")->fetch_assoc()['count'];
+            $item_count = $conn->query("SELECT COUNT(*) as count FROM item WHERE status_code = 1 AND is_deleted = 0")->fetch_assoc()['count'];
             $item_today = $conn->query("SELECT COUNT(DISTINCT item_id) as count FROM stock_in WHERE DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'];
             ?>
             <div style="display: flex; justify-content: space-between; align-items: center;">
@@ -106,11 +106,11 @@ $user_role = get_user_role();
         <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
             <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Equipment</div>
             <?php
-            $equipment_count = $conn->query("SELECT COUNT(*) as count FROM equipment WHERE status = 'operational'")->fetch_assoc()['count'];
+            $equipment_count = $conn->query("SELECT COUNT(*) as count FROM equipment WHERE status = 'operational' AND is_deleted = 0")->fetch_assoc()['count'];
             // Check if datetime_added column exists in equipment table
             $equipment_cols = $conn->query("SHOW COLUMNS FROM equipment LIKE 'datetime_added'");
             $equipment_today = ($equipment_cols && $equipment_cols->num_rows > 0) ? 
-                $conn->query("SELECT COUNT(*) as count FROM equipment WHERE DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
+                $conn->query("SELECT COUNT(*) as count FROM equipment WHERE is_deleted = 0 AND DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
             ?>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #4a5568;"><?php echo $equipment_count; ?></div>
@@ -152,11 +152,11 @@ $user_role = get_user_role();
         <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
             <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Tests</div>
             <?php
-            $test_count = $conn->query("SELECT COUNT(*) as count FROM test")->fetch_assoc()['count'];
+            $test_count = $conn->query("SELECT COUNT(*) as count FROM test WHERE is_deleted = 0")->fetch_assoc()['count'];
             // Check if datetime_added column exists in test table
             $test_cols = $conn->query("SHOW COLUMNS FROM test LIKE 'datetime_added'");
             $test_today = ($test_cols && $test_cols->num_rows > 0) ? 
-                $conn->query("SELECT COUNT(*) as count FROM test WHERE DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
+                $conn->query("SELECT COUNT(*) as count FROM test WHERE is_deleted = 0 AND DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
             ?>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #4a5568;"><?php echo $test_count; ?></div>
@@ -175,7 +175,7 @@ $user_role = get_user_role();
         <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
             <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Employees</div>
             <?php
-            $employee_count = $conn->query("SELECT COUNT(*) as count FROM employee WHERE status_code = 1")->fetch_assoc()['count'];
+            $employee_count = $conn->query("SELECT COUNT(*) as count FROM employee WHERE status_code = 1 AND is_deleted = 0")->fetch_assoc()['count'];
             // Check if datetime_added column exists in employee table
             $employee_cols = $conn->query("SHOW COLUMNS FROM employee LIKE 'datetime_added'");
             $employee_today = ($employee_cols && $employee_cols->num_rows > 0) ? 
@@ -198,11 +198,11 @@ $user_role = get_user_role();
         <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
             <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Sections</div>
             <?php
-            $section_count = $conn->query("SELECT COUNT(*) as count FROM section")->fetch_assoc()['count'];
+            $section_count = $conn->query("SELECT COUNT(*) as count FROM section WHERE is_deleted = 0")->fetch_assoc()['count'];
             // Check if datetime_added column exists in section table
             $section_cols = $conn->query("SHOW COLUMNS FROM section LIKE 'datetime_added'");
             $section_today = ($section_cols && $section_cols->num_rows > 0) ? 
-                $conn->query("SELECT COUNT(*) as count FROM section WHERE DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
+                $conn->query("SELECT COUNT(*) as count FROM section WHERE is_deleted = 0 AND DATE(datetime_added) = CURDATE()")->fetch_assoc()['count'] : 0;
             ?>
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div style="font-size: 2rem; font-weight: bold; color: #4a5568;"><?php echo $section_count; ?></div>

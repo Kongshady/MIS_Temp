@@ -12,7 +12,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $or_number = $_POST['or_number'];
             
             // Validate that client exists
-            $check_client = $conn->query("SELECT patient_id FROM patient WHERE patient_id = " . intval($client_id));
+            $check_client = $conn->query("SELECT patient_id FROM patient WHERE patient_id = " . intval($client_id) . " AND is_deleted = 0");
             if ($check_client->num_rows == 0) {
                 $message = '<div class="alert alert-danger">Error: Selected client does not exist. Please select a valid client or <a href="patients.php">add a new patient first</a>.</div>';
             } else {

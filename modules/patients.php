@@ -72,7 +72,7 @@ $patient_type = isset($_GET['patient_type']) ? $_GET['patient_type'] : '';
 $gender = isset($_GET['gender']) ? $_GET['gender'] : '';
 
 // Build query with filters
-$query = "SELECT p.* FROM patient p WHERE p.status_code = 1";
+$query = "SELECT p.* FROM patient p WHERE p.status_code = 1 AND p.is_deleted = 0";
 $conditions = [];
 $params = [];
 $types = '';

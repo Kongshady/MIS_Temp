@@ -48,7 +48,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 }
 
 // Get equipment details
-$equipment = $conn->query("SELECT e.*, s.label as section_name FROM equipment e LEFT JOIN section s ON e.section_id = s.section_id WHERE e.equipment_id = $equipment_id")->fetch_assoc();
+$equipment = $conn->query("SELECT e.*, s.label as section_name FROM equipment e LEFT JOIN section s ON e.section_id = s.section_id WHERE e.equipment_id = $equipment_id AND e.is_deleted = 0")->fetch_assoc();
 
 if (!$equipment) {
     echo '<div class="container"><div class="alert alert-danger">Equipment not found!</div></div>';
@@ -203,7 +203,7 @@ $history = $conn->query("SELECT mh.*, e.firstname, e.lastname
                 <select name="responsible_employee_id" class="form-control">
                     <option value="">Select Employee</option>
                     <?php 
-                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>
@@ -216,7 +216,7 @@ $history = $conn->query("SELECT mh.*, e.firstname, e.lastname
                 <select name="responsible_section_id" class="form-control">
                     <option value="">Select Section</option>
                     <?php 
-                    $sections = $conn->query("SELECT * FROM section");
+                    $sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0");
                     while($sec = $sections->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $sec['section_id']; ?>"><?php echo htmlspecialchars($sec['label']); ?></option>
@@ -249,7 +249,7 @@ $history = $conn->query("SELECT mh.*, e.firstname, e.lastname
                 <select name="performed_by" class="form-control" required>
                     <option value="">Select Employee</option>
                     <?php 
-                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1");
+                    $employees = $conn->query("SELECT * FROM employee WHERE status_code = 1 AND is_deleted = 0");
                     while($emp = $employees->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $emp['employee_id']; ?>"><?php echo htmlspecialchars($emp['firstname'] . ' ' . $emp['lastname']); ?></option>

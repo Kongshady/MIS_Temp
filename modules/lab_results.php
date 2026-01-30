@@ -132,37 +132,61 @@ $orders = $conn->query($query);
 $pending_count = $conn->query("SELECT COUNT(*) as count FROM lab_test_order WHERE status IN ('pending', 'in_progress')")->fetch_assoc()['count'];
 
 // Get sections for filter
-$sections = $conn->query("SELECT * FROM section ORDER BY label");
+$sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0 ORDER BY label");
 ?>
 
 <div class="container">
     <?php echo $message; ?>
     
     <!-- Statistics Cards -->
-    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem;">
-        <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h4 style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Pending Orders</h4>
-            <p style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0 0 0;"><?php echo $pending_count; ?></p>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: .5rem;">
+        <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Pending Orders</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #4a5568;"><?php echo $pending_count; ?></div>
+                <div style="color: #ed8936; font-size: 1.25rem; font-weight: 600;">
+                    <i class="fas fa-clock" style="font-size: 0.9rem;"></i>
+                </div>
+            </div>
+            <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                Awaiting results
+            </div>
         </div>
         
-        <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h4 style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Today's Orders</h4>
-            <p style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0 0 0;">
-                <?php 
-                $today = $conn->query("SELECT COUNT(*) as count FROM lab_test_order WHERE DATE(order_date) = CURDATE()")->fetch_assoc()['count'];
-                echo $today; 
-                ?>
-            </p>
+        <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Today's Orders</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #4a5568;">
+                    <?php 
+                    $today = $conn->query("SELECT COUNT(*) as count FROM lab_test_order WHERE DATE(order_date) = CURDATE()")->fetch_assoc()['count'];
+                    echo $today; 
+                    ?>
+                </div>
+                <div style="color: #5a67d8; font-size: 1.25rem; font-weight: 600;">
+                    <i class="fas fa-calendar-day" style="font-size: 0.9rem;"></i>
+                </div>
+            </div>
+            <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                Orders placed today
+            </div>
         </div>
         
-        <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); color: white; padding: 1.5rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-            <h4 style="margin: 0; font-size: 0.9rem; opacity: 0.9;">Completed Today</h4>
-            <p style="font-size: 2rem; font-weight: bold; margin: 0.5rem 0 0 0;">
-                <?php 
-                $completed = $conn->query("SELECT COUNT(*) as count FROM lab_test_order WHERE status = 'completed' AND DATE(order_date) = CURDATE()")->fetch_assoc()['count'];
-                echo $completed; 
-                ?>
-            </p>
+        <div class="card" style="padding: 1.5rem; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); border: 1px solid #f0f0f0;">
+            <div style="color: #666; font-size: 0.875rem; margin-bottom: 0.5rem; font-weight: 500;">Completed Today</div>
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="font-size: 2rem; font-weight: bold; color: #4a5568;">
+                    <?php 
+                    $completed = $conn->query("SELECT COUNT(*) as count FROM lab_test_order WHERE status = 'completed' AND DATE(order_date) = CURDATE()")->fetch_assoc()['count'];
+                    echo $completed; 
+                    ?>
+                </div>
+                <div style="color: #48bb78; font-size: 1.25rem; font-weight: 600;">
+                    <i class="fas fa-check-circle" style="font-size: 0.9rem;"></i>
+                </div>
+            </div>
+            <div style="color: #999; font-size: 0.75rem; margin-top: 0.5rem;">
+                Results finalized
+            </div>
         </div>
     </div>
     
@@ -338,7 +362,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                 <select name="physician_id" class="form-control">
                     <option value="">-- No Physician --</option>
                     <?php 
-                    $physicians = $conn->query("SELECT physician_id, physician_name, specialization FROM physician WHERE status_code = 1 ORDER BY physician_name");
+                    $physicians = $conn->query("SELECT physician_id, physician_name, specialization FROM physician WHERE status_code = 1 AND is_deleted = 0 ORDER BY physician_name");
                     while($physician = $physicians->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $physician['physician_id']; ?>">
@@ -355,7 +379,7 @@ $sections = $conn->query("SELECT * FROM section ORDER BY label");
                 <label>Tests * (Select one or more)</label>
                 <div style="max-height: 250px; overflow-y: auto; border: 1px solid #ddd; padding: 1rem; border-radius: 5px; background: #f9f9f9;">
                     <?php 
-                    $tests = $conn->query("SELECT t.*, s.label as section_name FROM test t LEFT JOIN section s ON t.section_id = s.section_id ORDER BY s.label, t.label");
+                    $tests = $conn->query("SELECT t.*, s.label as section_name FROM test t LEFT JOIN section s ON t.section_id = s.section_id WHERE t.is_deleted = 0 ORDER BY s.label, t.label");
                     $current_section = '';
                     while($test = $tests->fetch_assoc()): 
                         if ($current_section != $test['section_name']) {

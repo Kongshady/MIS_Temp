@@ -69,8 +69,9 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             }
         } elseif ($_POST['action'] == 'delete') {
             $test_id = $_POST['test_id'];
-            $stmt = $conn->prepare("DELETE FROM test WHERE test_id=?");
-            $stmt->bind_param("i", $test_id);
+            $user_id = get_user_id();
+            $stmt = $conn->prepare("UPDATE test SET is_deleted = 1, deleted_at = NOW(), deleted_by = ? WHERE test_id = ?");
+            $stmt->bind_param("ii", $user_id, $test_id);
             
             if ($stmt->execute()) {
                 $message = '<div class="alert alert-success">Test deleted successfully!</div>';
@@ -85,7 +86,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 $rows_per_page = isset($_GET['rows']) && $_GET['rows'] !== 'all' ? (int)$_GET['rows'] : 0;
 
 // Get all tests
-$tests = $conn->query("SELECT t.*, s.label as section_name FROM test t LEFT JOIN section s ON t.section_id = s.section_id ORDER BY t.test_id DESC");
+$tests = $conn->query("SELECT t.*, s.label as section_name FROM test t LEFT JOIN section s ON t.section_id = s.section_id WHERE t.is_deleted = 0 ORDER BY t.test_id DESC");
 
 // Apply pagination if needed
 if ($rows_per_page > 0) {
@@ -144,7 +145,7 @@ $history_table_exists = $tables && $tables->num_rows > 0;
                     <select name="section_id" class="form-control" required>
                         <option value="">Select Section</option>
                         <?php 
-                        $sections = $conn->query("SELECT * FROM section");
+                        $sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0");
                         while($section = $sections->fetch_assoc()): 
                         ?>
                             <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>
@@ -319,7 +320,7 @@ $history_table_exists = $tables && $tables->num_rows > 0;
                 <label>Section *</label>
                 <select name="section_id" id="edit_section_id" class="form-control" required>
                     <?php 
-                    $sections = $conn->query("SELECT * FROM section");
+                    $sections = $conn->query("SELECT * FROM section WHERE is_deleted = 0");
                     while($section = $sections->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $section['section_id']; ?>"><?php echo htmlspecialchars($section['label']); ?></option>

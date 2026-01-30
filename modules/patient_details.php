@@ -68,7 +68,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
 // Get patient details
 $patient_query = $conn->prepare("SELECT p.* 
                                  FROM patient p 
-                                 WHERE p.patient_id = ?");
+                                 WHERE p.patient_id = ? AND p.is_deleted = 0");
 $patient_query->bind_param("i", $patient_id);
 $patient_query->execute();
 $patient_result = $patient_query->get_result();
@@ -200,7 +200,7 @@ $lab_results = $conn->query("SELECT lr.*, t.label as test_name, e.firstname, e.l
                 <select name="test_id" class="form-control" required>
                     <option value="">Select Test</option>
                     <?php 
-                    $tests = $conn->query("SELECT * FROM test ORDER BY label");
+                    $tests = $conn->query("SELECT * FROM test WHERE is_deleted = 0 ORDER BY label");
                     while($test = $tests->fetch_assoc()): 
                     ?>
                         <option value="<?php echo $test['test_id']; ?>">

@@ -478,7 +478,7 @@ function get_accessible_menu() {
             'label' => 'Lab Results',
             'url' => 'lab_results.php',
             'icon' => '<i class="fa-solid fa-microscope"></i>',
-            'permission' => 'lab_results.view'
+            'permission' => 'results.view'
         ],
         [
             'label' => 'Tests',
@@ -496,7 +496,7 @@ function get_accessible_menu() {
             'label' => 'Employees',
             'url' => 'employees.php',
             'icon' => '<i class="fa-solid fa-user-tie"></i>',
-            'permission' => 'employees.view'
+            'permission' => 'users.view'
         ],
         [
             'label' => 'Transactions',
